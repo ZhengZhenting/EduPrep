@@ -40,7 +40,7 @@ async def upload_pdf(file: UploadFile = File(...)):
             full_text += text
 
 
-    # 3. 存储提取的文本（这里用内存字典，后续接入vector db）
+    # 3. 存储提取的文本（这里用内存字典，后续接入vector db！！！）
     pdf_text_store[file.filename] = full_text
 
     # 4. 返回提取的文本
@@ -84,7 +84,7 @@ async def ask_question(request: QueryRequest):
         response = await client.post(
             "http://localhost:11434/api/generate",
             json={
-                "model": "qwen2.5:3b",
+                "model": "qwen3:4b",
                 "prompt": prompt,
                 "stream": False
             }
