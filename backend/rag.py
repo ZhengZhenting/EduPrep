@@ -1,0 +1,69 @@
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import OllamaEmbeddings
+import os
+
+# ChromaDB存储路径（程序关闭后数据不丢失），./ 的意思是"当前目录"，也就是运行 uvicorn 命令时所在的backend文件夹
+CHROMA_DIR = "./chroma_db" 
+
+# 使用的Embedding模型名（from ollama list）
+EMBEDDING_MODEL = "embeddinggemma:latest"
+
+def get_embedding_function():
+    """docstring ：
+    返回Ollama的Embedding函数模型，
+    每次调用这个函数，都会使用同一个Embedding模型，
+    关键点在于存块时用什么Embedding模型，查询时就必须用同一个模型，否则向量空间不一致，查询结果会很差甚至完全不相关
+    把它封装成函数，是为了保证两处（store,search）都调用同一个地方
+    """
+
+    return OllamaEmbeddings(model=EMBEDDING_MODEL)
+
+
+def store_chunks(chunks:list, filename: str):
+    """
+    把PDF切块存入ChromaDB
+    用filename作为collection名，每个PDF独立存储
+    """
+
+    # collection名不能有特殊字符
+    collection_name=filename.replace(".","_").replace(" ","_")  
+
+    # 如果这个PDF之前存过，先删除旧数据再重新存
+    db=Chroma(
+        collection_name=collection_name,
+        embedding_function=get_embedding_function(),
+        persist_directory=CHROMA_DIR
+    )
+    db.delete_collection()  
+
+    # 重新创建collection并存入新数据
+    # 这里的from_documents方法会自动计算每个chunk的embedding并存储到ChromaDB
+    db=Chroma.from_documents(
+        documents=chunks,
+        embedding=get_embedding_function(),
+        collection_name=collection_name,
+        persist_directory=CHROMA_DIR
+    )
+
+    print(f"Chunks stored in ChromaDB: {len(chunks)} chunks, collection name = {collection_name}.")
+    return collection_name
+
+def search_chunks(query: str, filename:str, k:int=5):
+    """
+    根据问题，从ChromaDB里找最相关的k个块
+    原理：把query也向量化，找向量距离最近的k个块 
+    """
+
+    collection_name=filename.replace(".","_").replace(" ","_")  
+
+    db = Chroma(
+        collection_name=collection_name,
+        embedding_function=get_embedding_function(),
+        persist_directory=CHROMA_DIR
+    )
+
+    # similarity_search会把query用同一个Embedding模型转成向量,计算它与数据库里所有向量的余弦相似度,返回最相似的k个块
+    results = db.similarity_search(query, k=k)
+
+    return results
+
