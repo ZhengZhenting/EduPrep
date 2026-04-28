@@ -1,5 +1,5 @@
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import OllamaEmbeddings
+from langchain_chroma import Chroma
+from langchain_ollama import OllamaEmbeddings
 import os
 
 # ChromaDB存储路径（程序关闭后数据不丢失），./ 的意思是"当前目录"，也就是运行 uvicorn 命令时所在的backend文件夹
