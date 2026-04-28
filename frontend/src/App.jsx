@@ -1,14 +1,15 @@
 import { useState } from 'react'
-import axios from 'axios'
 
 const API = 'http://localhost:8000'  // 对接后端API地址
 
 function App() {
   // 状态管理
   const [uploadStatus, setUploadStatus] = useState('')
-  const [filename, setFilename] = useState('')    
+  const [filename, setFilename] = useState('')
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
+  const [sources, setSources] = useState([])      // 页码来源
+  const [history, setHistory] = useState([])      // 对话历史
   const [uploading, setUploading] = useState(false)
   const [asking, setAsking] = useState(false)
 
@@ -19,15 +20,20 @@ function App() {
     if (!file) return //如果用户没有选文件就关掉了弹窗，直接退出，什么都不做。
 
     setUploading(true)
-    setUploadStatus('uploading')
+    setUploadStatus('uploading...')
 
     const formData = new FormData()
     formData.append('file', file) //这个名字必须和后端完全一致 — 后端写的是 file: UploadFile = File(...)，所以前端这里也必须叫 'file'
 
     try {
-      const res = await axios.post(`${API}/upload`, formData) //await 表示等待后端处理完毕再继续执行下一行。
-      setFilename(res.data.filename)  //这里取出 filename 存起来，因为下面提问时需要告诉后端是哪个文件
-      setUploadStatus(`File ${res.data.filename} successfully uploaded, ${res.data.pages} pages in total`) //后端返回的JSON里面的字段见后端的 upload() 函数 return {'filename': filename, 'pages': num_pages......}
+      const res = await fetch(`${API}/upload`, {
+        method: 'POST',
+        body: formData
+      })
+      const data = await res.json()
+      setFilename(data.filename)  //这里取出 filename 存起来，因为下面提问时需要告诉后端是哪个文件
+      setUploadStatus(`File ${data.filename} successfully uploaded, ${data.chunks} chunks in total`) //后端返回的JSON里面的字段见后端的 upload() 函数 return {'filename': filename, 'chunks': num_chunks......}
+      setHistory([]) //上传新文件后清空对话历史
     } catch (err) {
       setUploadStatus(`Upload failed: ${err.message}`)
     }
@@ -35,29 +41,74 @@ function App() {
     setUploading(false)
   }
 
-  // 处理提问Ask
+  // 处理提问Ask（支持流式输出）
   const handleAsk = async (e) => {
-    if (!question.trim()) return
-    if (!filename) {
-      setAnswer('Please upload a PDF first.')
-      return
-    }
+    if (!question.trim() || !filename || asking) return
 
+    const currentQuestion = question
+    setQuestion('')
     setAsking(true)
-    setAnswer('thinking...')
+    setAnswer('')
+    setSources([])
+
+    const newHistory = [...history, { role: 'user', content: currentQuestion }]
 
     try {
-      const res = await axios.post(`${API}/ask`, {
-        question: question,
-        filename: filename
+      const response = await fetch(`${API}/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          history: history,
+          question: currentQuestion,
+          filename: filename
+        })
       })
-      setAnswer(res.data.answer)
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let fullAnswer = ''
+      let firstLine = true
+      let currentSources = [] 
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const text = decoder.decode(value)
+        if (firstLine) {
+          try {
+            const lines = text.split('\n')
+            const sourceData = JSON.parse(lines[0])  //第一行是页码来源信息，格式是JSON字符串，见后端 stream_response() 里 yield 的 sources_line
+            currentSources = sourceData.sources
+            setSources(currentSources)
+            const rest = lines.slice(1).join('\n')  //剩下的才是AI的回答内容
+            if (rest) {
+              fullAnswer += rest
+              setAnswer(fullAnswer)
+            }
+          } catch {
+            fullAnswer += text
+            setAnswer(fullAnswer)
+          }
+          firstLine = false
+        } else {
+          fullAnswer += text
+          setAnswer(fullAnswer)
+        }
+      }
+      // 把这轮完整对话加入历史
+      setHistory([
+        ...newHistory,
+        { role: 'assistant', content: fullAnswer, sources: currentSources }
+      ])
+
     } catch (err) {
-      setAnswer(`Error: ${err.message}`)
+      setAnswer(`Error：${err.message}`)
     }
 
     setAsking(false)
   }
+
 
   //处理回车键提问
   const handleKeyDown = (e) => {
@@ -66,141 +117,101 @@ function App() {
     }
   }
 
-
-
+  // 清空对话
+  const handleClear = () => {
+    setHistory([])
+    setAnswer('')
+    setSources([])
+  }
 
   // HTML
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>📚 EduPrep</h1>
-      <p style={styles.subtitle}>uploadPDF，using AI to help you understand</p>
 
       {/* 上传区域 */}
       <div style={styles.card}>
-        <h2 style={styles.cardTitle}>First Step: Upload a PDF File</h2>
-        <input
-          type="file"
-          accept=".pdf"
-          onChange={handleUpload}
-          disabled={uploading}
-          style={styles.fileInput}
-        />
-        {uploadStatus && (
-          <p style={styles.statusText}>{uploadStatus}</p>
-        )}
+        <h2 style={styles.cardTitle}>上传PDF</h2>
+        <input type="file" accept=".pdf" onChange={handleUpload} disabled={uploading} />
+        {uploadStatus && <p style={styles.status}>{uploadStatus}</p>}
       </div>
 
-      {/* 提问区域 */}
+      {/* 对话历史 */}
+      {history.length > 0 && (
+        <div style={styles.card}>
+          <div style={styles.historyHeader}>
+            <h2 style={styles.cardTitle}>对话记录</h2>
+            <button onClick={handleClear} style={styles.clearBtn}>清空</button>
+          </div>
+          {history.map((msg, i) => (
+            <div key={i} style={msg.role === 'user' ? styles.userMsg : styles.aiMsg}>
+              <strong>{msg.role === 'user' ? '你' : 'AI'}：</strong>
+              {msg.content}
+              {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
+                <div style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>
+                  📄 来源：第 {msg.sources.join('、')} 页
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 当前回答（流式显示） */}
+      {(answer || asking) && (
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>
+            AI回答
+            {asking && <span style={styles.typing}> ▌</span>}
+          </h2>
+          {sources.length > 0 && (
+            <p style={styles.sources}>
+              📄 来源：第 {sources.join('、')} 页
+            </p>
+          )}
+          <p style={styles.answerText}>{answer}</p>
+        </div>
+      )}
+
+      {/* 输入框 */}
       <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Second Step: Ask A Question</h2>
+        <h2 style={styles.cardTitle}>提问</h2>
         <input
-          type="text"
           value={question}
           onChange={e => setQuestion(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="input your question..."
-          disabled={asking}
+          placeholder={filename ? '输入问题，按回车发送...' : '请先上传PDF'}
+          disabled={asking || !filename}
           style={styles.input}
         />
         <button
           onClick={handleAsk}
           disabled={asking || !filename}
-          style={asking || !filename ? styles.buttonDisabled : styles.button}
+          style={asking || !filename ? styles.btnDisabled : styles.btn}
         >
-          {asking ? 'thinking...' : 'asking'}
+          {asking ? '回答中...' : '提问'}
         </button>
       </div>
-
-
-      {/* 回答区域 */}
-      {answer && (
-        <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Answer from AI</h2>
-          <p style={styles.answerText}>{answer}</p>
-        </div>
-      )}
     </div>
   )
 }
 
-
-
-
-
-// Styles
 const styles = {
-  container: {
-    maxWidth: '720px',
-    margin: '0 auto',
-    padding: '40px 20px',
-    fontFamily: 'sans-serif',
-  },
-  title: {
-    fontSize: '32px',
-    fontWeight: 'bold',
-    marginBottom: '8px',
-    color: '#1a1a1a',
-  },
-  subtitle: {
-    fontSize: '16px',
-    color: '#666',
-    marginBottom: '32px',
-  },
-  card: {
-    border: '1px solid #e0e0e0',
-    borderRadius: '12px',
-    padding: '24px',
-    marginBottom: '20px',
-    backgroundColor: '#fff',
-  },
-  cardTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    marginBottom: '16px',
-    color: '#1a1a1a',
-  },
-  fileInput: {
-    fontSize: '14px',
-    color: '#333',
-  },
-  statusText: {
-    marginTop: '12px',
-    fontSize: '14px',
-    color: '#444',
-  },
-  input: {
-    width: '100%',
-    padding: '10px 14px',
-    fontSize: '15px',
-    border: '1px solid #ccc',
-    borderRadius: '8px',
-    marginBottom: '12px',
-    boxSizing: 'border-box',
-  },
-  button: {
-    padding: '10px 24px',
-    fontSize: '15px',
-    backgroundColor: '#2563eb',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-  },
-  buttonDisabled: {
-    padding: '10px 24px',
-    fontSize: '15px',
-    backgroundColor: '#9ca3af',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'not-allowed',
-  },
-  answerText: {
-    fontSize: '15px',
-    lineHeight: '1.7',
-    color: '#333',
-    whiteSpace: 'pre-wrap',   // 保留换行格式
-  },
+  container: { maxWidth: 720, margin: '0 auto', padding: '40px 20px', fontFamily: 'sans-serif' },
+  title: { fontSize: 28, fontWeight: 'bold', marginBottom: 24 },
+  card: { border: '1px solid #e0e0e0', borderRadius: 12, padding: 20, marginBottom: 16, background: '#fff' },
+  cardTitle: { fontSize: 16, fontWeight: 600, marginBottom: 12, marginTop: 0 },
+  status: { marginTop: 10, fontSize: 14, color: '#444' },
+  historyHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  clearBtn: { fontSize: 12, padding: '4px 10px', cursor: 'pointer', border: '1px solid #ccc', borderRadius: 6, background: '#fff' },
+  userMsg: { background: '#f0f4ff', borderRadius: 8, padding: '8px 12px', marginBottom: 8, fontSize: 14 },
+  aiMsg: { background: '#f5f5f5', borderRadius: 8, padding: '8px 12px', marginBottom: 8, fontSize: 14 },
+  sources: { fontSize: 13, color: '#2563eb', marginBottom: 8 },
+  answerText: { fontSize: 15, lineHeight: 1.7, whiteSpace: 'pre-wrap' },
+  typing: { color: '#2563eb', animation: 'blink 1s infinite' },
+  input: { width: '100%', padding: '10px 14px', fontSize: 15, border: '1px solid #ccc', borderRadius: 8, marginBottom: 10, boxSizing: 'border-box' },
+  btn: { padding: '10px 24px', fontSize: 15, background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' },
+  btnDisabled: { padding: '10px 24px', fontSize: 15, background: '#9ca3af', color: '#fff', border: 'none', borderRadius: 8, cursor: 'not-allowed' },
 }
 
 export default App
