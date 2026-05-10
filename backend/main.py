@@ -114,7 +114,7 @@ class PreviewRequest(BaseModel):
 async def generate_preview(request: PreviewRequest):
     queries = [
         "What is the main topic of this lecture?",
-        "What are the key technical terms and their definitions?",
+        "What are the key technical terms and their definitions?"
     ]
 
     all_chunks=[]
@@ -176,15 +176,104 @@ async def generate_preview(request: PreviewRequest):
         )
 
     result = response.json()
+    raw_text = result["response"].strip()
 
     try:
-        preview_data = json.loads(result)
+        preview_data = json.loads(raw_text)
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse AI response as JSON: {e}\nRaw response: {result}")
+        raise HTTPException(status_code=500, detail=f"Failed to parse AI response as JSON: {e}\nRaw response: {raw_text}")
 
     return {
         "filename": request.filename,
         "summary_de": preview_data.get("summary_de", ""),
         "summary_zh": preview_data.get("summary_zh", ""),
         "vocabulary": preview_data.get("vocabulary", [])
+    }
+
+
+class QuizRequest(BaseModel):
+    filename: str
+    num_questions: int = 5
+
+@app.post("/quiz")
+async def generate_quiz(request: QuizRequest):
+    queries=[
+             "What are the main concepts and definitions?",
+             "What are the key technical terms and their applications?",
+             "What are the important rules, principles or methods?"
+    ]
+
+    all_chunks=[]
+    seen_contents=set() # 用于去重，避免同一块被多次添加
+
+    for query in queries:
+            chunks = search_chunks(query, request.filename, k=3)
+            for chunk in chunks:
+                if chunk.page_content not in seen_contents:
+                    all_chunks.append(chunk)
+                    seen_contents.add(chunk.page_content)
+
+    if not all_chunks:
+            raise HTTPException(status_code=404, detail="Relevant chunks not found. Please upload the PDF first.")
+        
+    context = "\n\n---\n\n".join([c.page_content for c in all_chunks])
+    context = context[:4000]  
+
+    prompt=f""" You are an learning assistant creating multiple choice questions for students.
+                    Based on the following lecture content, generate exactly {request.num_questions} multiple choice questions in German.
+                    Lecture content:{context}
+                    Return ONLY a valid JSON object with exactly this structure:
+                    {{
+                        "questions": [
+                         {{
+                             "question": "Clear question based on the lecture content",
+                                "options": {{
+                                  "A": "first option",
+                                  "B": "second option",
+                                  "C": "third option",
+                                  "D": "fourth option"
+                               }},
+                                "answer": "A",
+                                "explanation": "Explanation in Chinese why this answer is correct"
+                            }}
+                        ]
+                    }}
+                    Rules:
+                    - Generate exactly {request.num_questions} questions
+                    - Each question must be based strictly on the lecture content
+                    - Only one option is correct
+                    - answer field must be exactly one of: A, B, C, D
+                    - explanation must be in Chinese, 1-2 sentences
+                    - options must cover plausible wrong answers, not obviously wrong
+                    - Return ONLY the JSON, no markdown, no explanation, no code blocks, no thinking"""
+        
+    async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": "qwen2.5:3b",
+                    "prompt": prompt,
+                    "stream": False,
+                    "think": False,
+                    "options": {
+                        "num_ctx": 4096,
+                        "temperature": 0.3
+                }
+            }
+        )
+            
+    result = response.json()
+    raw_text = result["response"].strip()
+
+    try:
+            quiz_data = json.loads(raw_text)
+    except json.JSONDecodeError as e:
+            raise HTTPException(status_code=500, detail=f"Failed to parse AI response as JSON: {e}\nRaw response: {raw_text}")
+        
+    questions=quiz_data.get("questions", [])
+    if not questions:
+            raise HTTPException(status_code=500, detail=f"No questions generated. Raw response: {raw_text}")
+    return {
+            "filename": request.filename,
+            "questions": questions
     }
