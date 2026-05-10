@@ -80,10 +80,10 @@ async def ask_question(request: QuestionRequest):
         else:
             history_text += f"{role_label}: {msg.content}\n"
 
-    prompt = f"""You are an assistant that helps answer questions based on the content of a PDF document. 
+    prompt = f"""You are an learning assistant that helps answer questions based on the content of a PDF document. 
             Here are the relevant chunks:{context} 
             {'Here are the recent conversation history:'+history_text if history_text else ''}
-            please answer the following question based on the above content: {request.question}
+            please answer the following question in Chinese based on the above content: {request.question}
             if it's not in the content, say "Sorry, I don't know the answer to that question based on the provided PDF."""
     
     sources_line = json.dumps({"sources": sources})  + "\n"  # 将页码列表转换为JSON字符串
@@ -92,7 +92,7 @@ async def ask_question(request: QuestionRequest):
             response = await client.post(
             "http://localhost:11434/api/generate",
             json={
-                "model": "qwen3:4b",
+                "model": "qwen2.5:3b",
                 "prompt": prompt,
                 "stream": False,
                 "think": False 
@@ -140,8 +140,8 @@ async def generate_preview(request: PreviewRequest):
                 {context}
                 Return ONLY a valid JSON object with exactly this structure, no other text before or after:
                 {{
-                    "summary_de": "3-4 sentences summary in German",
-                    "summary_zh": "3-4 sentences summary in Chinese",
+                    "summary_de": "5 sentences summary in German",
+                    "summary_zh": "5 sentences summary in Chinese",
                     "vocabulary": [
                     "Begriff1 (中文)",
                     "Begriff2 (中文)",
@@ -176,23 +176,11 @@ async def generate_preview(request: PreviewRequest):
         )
 
     result = response.json()
-    raw_text = result["response"].strip()
-    # 清理think标签（qwen3特有）
-    if "</think>" in raw_text:
-        raw_text = raw_text.split("</think>")[-1].strip()
-    # 清理markdown代码块
-    if raw_text.startswith("```"):
-        lines = raw_text.split("\n")
-        raw_text = "\n".join(lines[1:-1]).strip()
-    # 去掉首尾的```行
-    if raw_text.startswith("```"):
-        lines=raw_text.split("\n")
-        raw_text="\n".join(lines[1:-1])  
 
     try:
-        preview_data = json.loads(raw_text)
+        preview_data = json.loads(result)
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse AI response as JSON: {e}\nRaw response: {raw_text}")
+        raise HTTPException(status_code=500, detail=f"Failed to parse AI response as JSON: {e}\nRaw response: {result}")
 
     return {
         "filename": request.filename,
