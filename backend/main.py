@@ -1,6 +1,5 @@
 from fastapi import FastAPI, UploadFile, File,  HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import httpx
@@ -26,18 +25,17 @@ app.add_middleware(
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
     
-    content = await file.read() # 读取上传的文件内容  
-   
-    chunks=process_pdf(content, file.filename)   # 调用pdf_processor.py中的函数，返回切好的文本块列表
+    content = await file.read() 
+    chunks=process_pdf(content, file.filename)  
+    store_chunks(chunks, file.filename) 
 
-    store_chunks(chunks, file.filename)  # 存入ChromaDB
 
-    # 返回提取的文本
     return {
         "message": "PDF uploaded and text extracted successfully!",
         "filename": file.filename, 
         "chunks": len(chunks)
     }
+
 
 # 对话历史的单条格式
 class Message(BaseModel):
@@ -45,42 +43,43 @@ class Message(BaseModel):
     content: str
     sources: Optional[List[int]] = []
 
+
 # 问答接口：RAG检索 → 组装Prompt → LLM回答
 class QuestionRequest(BaseModel):
     filename: str
     question: str
-    history: Optional[List[Message]] = []  # 可选的对话历史，默认为空列表
+    history: Optional[List[Message]] = []  
+
 
 @app.post("/ask")
 async def ask_question(request: QuestionRequest):
-    # 1. 从ChromaDB检索最相关的5个块
+    # 从ChromaDB检索最相关的5个块
     relevant_chunks = search_chunks(request.question, request.filename, k=5)
     if not relevant_chunks:
         raise HTTPException(status_code=404, detail="Relevant chunks not found. Please upload the PDF first.")
     
 
-    # 2. 把检索到的块组装成上下文,同时收集页码信息
+    # 把检索到的块组装成上下文,同时收集页码信息
     context_parts=[]
-    pages_used=set()  # 用set收集页码，避免重复，后续可以把用到的页码也返回给前端，提示用户答案来源于PDF的哪些页
+    pages_used=set()  
     
     for chunk in relevant_chunks:
         context_parts.append(chunk.page_content) # page_content是LangChain文档对象的属性
         page_num=chunk.metadata.get("page",0)+1  # 页码从0开始，所以+1
         pages_used.add(page_num)
 
-    context = "\n\n---\n\n".join(context_parts) # 用分隔符连接多个块，保持一定的格式，方便AI理解
-    sources = sorted(list(pages_used))  # 将页码排序后转换为列表，方便返回给前端
+    context = "\n\n---\n\n".join(context_parts)
+    sources = sorted(list(pages_used))
 
     history_text=""
-    for msg in request.history[-6:]:  # 只保留最近6条对话历史，避免Prompt过长
+    for msg in request.history[-6:]:  # 只保留最近6条对话历史
         role_label="Student" if msg.role=="user" else "Assistant"
         if msg.role == "assistant" and msg.sources:
-            sources_label = f"(来源：第 {', '.join(str(p) for p in msg.sources)} 页)"
+            sources_label = f"(Source from Pages： {', '.join(str(p) for p in msg.sources)} )"
             history_text += f"{role_label}{sources_label}: {msg.content}\n"
         else:
             history_text += f"{role_label}: {msg.content}\n"
 
-    # 3. 构造发给AI的Prompt
     prompt = f"""You are an assistant that helps answer questions based on the content of a PDF document. 
             Here are the relevant chunks:{context} 
             {'Here are the recent conversation history:'+history_text if history_text else ''}
@@ -89,37 +88,115 @@ async def ask_question(request: QuestionRequest):
     
     sources_line = json.dumps({"sources": sources})  + "\n"  # 将页码列表转换为JSON字符串
 
-    # 4. 调用AI接口,定义流式生成器函数，每次生成一小块文字就发送给前端
-    async def stream_response():
+    async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "qwen3:4b",
+                "prompt": prompt,
+                "stream": False,
+                "think": False 
+            }
+        )
+    result = response.json()
+        
+    return {
+        "question": request.question,
+        "answer": result["response"],
+        "sources": sources
+    }
 
-        yield sources_line  # 先发送页码信息，让前端知道答案来源于PDF的哪些页
+
+class PreviewRequest(BaseModel):
+    filename: str
+
+@app.post("/preview")
+async def generate_preview(request: PreviewRequest):
+    queries = [
+        "What is the main topic of this lecture?",
+        "What are the key technical terms and their definitions?",
+    ]
+
+    all_chunks=[]
+    seen_contents=set() # 用于去重，避免同一块被多次添加
+
+    for query in queries:
+        chunks = search_chunks(query, request.filename, k=3)
+        for chunk in chunks:
+            if chunk.page_content not in seen_contents:
+                all_chunks.append(chunk)
+                seen_contents.add(chunk.page_content)
+
+    if not all_chunks:
+        raise HTTPException(status_code=404, detail="Relevant chunks not found. Please upload the PDF first.")
     
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            async with client.stream(
-                "POST",
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": "qwen3:4b",
-                    "prompt": prompt,
-                    "stream": True
-                }
-            )as response:
-                async for line in response.aiter_lines():
-                    if line:
-                        try:
-                            data = json.loads(line)
-                            # Ollama每次返回一小块文字
-                            token = data.get("response", "")
-                            if token:
-                                yield token  # 直接把文字块发给前端
-                            # done=True说明生成完毕
-                            if data.get("done"):
-                                break
-                        except json.JSONDecodeError:
-                            continue
+    context = "\n\n---\n\n".join([c.page_content for c in all_chunks])
+    context = context[:3000]  # 限制上下文长度，避免超过模型输入限制
 
-        # 5. 返回StreamingResponse，媒体类型是纯文本
-    return StreamingResponse(
-        stream_response(),
-        media_type="text/plain"
-    )
+    prompt = f"""/no_think
+                You are an academic assistant helping international students understand lecture materials.
+                Based on the following lecture content, generate a structured preview.
+                Lecture content:
+                {context}
+                Return ONLY a valid JSON object with exactly this structure, no other text before or after:
+                {{
+                    "summary_de": "3-4 sentences summary in German",
+                    "summary_zh": "3-4 sentences summary in Chinese",
+                    "vocabulary": [
+                    "Begriff1 (中文)",
+                    "Begriff2 (中文)",
+                    "Begriff3 (中文)",
+                    "Begriff4 (中文)",
+                    "Begriff5 (中文)",
+                    "Begriff6 (中文)",
+                    "Begriff7 (中文)",
+                    "Begriff8 (中文)",
+                    "Begriff9 (中文)",
+                    "Begriff10 (中文)"
+                    ]
+                }}
+
+                Rules:
+                - Extract exactly 10 most important technical terms for vocabulary in both German and Chinese, and format them as "Term (Chinese translation)".
+                - Return ONLY the JSON, no markdown, no explanation, no code blocks, no thinking""" 
+    
+    async with httpx.AsyncClient(timeout=180.0) as client:
+        response = await client.post(
+        "http://localhost:11434/api/generate",
+        json={
+            "model": "qwen2.5:3b",
+            "prompt": prompt,
+            "stream": False,
+            "think": False,
+            "options": {
+                "num_ctx": 4096,
+                "temperature": 0.3
+            }
+        }
+        )
+
+    result = response.json()
+    raw_text = result["response"].strip()
+    # 清理think标签（qwen3特有）
+    if "</think>" in raw_text:
+        raw_text = raw_text.split("</think>")[-1].strip()
+    # 清理markdown代码块
+    if raw_text.startswith("```"):
+        lines = raw_text.split("\n")
+        raw_text = "\n".join(lines[1:-1]).strip()
+    # 去掉首尾的```行
+    if raw_text.startswith("```"):
+        lines=raw_text.split("\n")
+        raw_text="\n".join(lines[1:-1])  
+
+    try:
+        preview_data = json.loads(raw_text)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse AI response as JSON: {e}\nRaw response: {raw_text}")
+
+    return {
+        "filename": request.filename,
+        "summary_de": preview_data.get("summary_de", ""),
+        "summary_zh": preview_data.get("summary_zh", ""),
+        "vocabulary": preview_data.get("vocabulary", [])
+    }
