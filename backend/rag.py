@@ -67,3 +67,20 @@ def search_chunks(query: str, filename:str, k:int=5):
 
     return results
 
+def search_chunks_with_score(query: str, filename: str, k: int = 5):
+    """
+    和search_chunks一样，但同时返回相关性分数
+    分数是向量距离，越小说明越相关
+    """
+    collection_name = filename.replace(".","_").replace(" ","_")
+
+    db = Chroma(
+        collection_name=collection_name,
+        embedding_function=get_embedding_function(),
+        persist_directory=CHROMA_DIR
+    )
+
+    # 返回 [(Document, score), (Document, score), ...]
+    results = db.similarity_search_with_score(query, k=k)
+    return results
+

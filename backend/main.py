@@ -2,15 +2,22 @@ from fastapi import FastAPI, UploadFile, File,  HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
+from tavily import TavilyClient
+from dotenv import load_dotenv #读取环境变量
+import os
 import httpx
 import json
 
 from pdf_processor import process_pdf
-from rag import store_chunks, search_chunks
+from rag import store_chunks, search_chunks, search_chunks_with_score
 
 
 # 创建FastAPI应用,测试接口: http://localhost:8000/docs, uvicorn running on: http://127.0.0.1:8000
 app = FastAPI()
+
+# 初始化Tavily客户端
+load_dotenv()  # 加载环境变量
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 # 允许前端跨域访问（前后端分离时必须配置）
 app.add_middleware(
@@ -41,7 +48,8 @@ async def upload_pdf(file: UploadFile = File(...)):
 class Message(BaseModel):
     role: str 
     content: str
-    sources: Optional[List[int]] = []
+    sources: Optional[List] = []
+    source_type: Optional[str] = "pdf"
 
 
 # 问答接口：RAG检索 → 组装Prompt → LLM回答
@@ -54,39 +62,72 @@ class QuestionRequest(BaseModel):
 @app.post("/ask")
 async def ask_question(request: QuestionRequest):
     # 从ChromaDB检索最相关的5个块
-    relevant_chunks = search_chunks(request.question, request.filename, k=5)
-    if not relevant_chunks:
+    results_with_score = search_chunks_with_score(request.question, request.filename, k=5)
+    if not results_with_score:
         raise HTTPException(status_code=404, detail="Relevant chunks not found. Please upload the PDF first.")
     
+    best_score=min(score for _, score in results_with_score)
+    print(f"RAG最佳相关性分数: {best_score}")
+    SCORE_THRESHOLD = 1.1  # 分数阈值：低于1.1说明PDF里有相关内容
+    use_web_search = best_score > SCORE_THRESHOLD
 
-    # 把检索到的块组装成上下文,同时收集页码信息
-    context_parts=[]
-    pages_used=set()  
+    if use_web_search: 
+        print(f"RAG分数{best_score}超过阈值，切换到网络搜索")
+        try:
+            tavily_client=TavilyClient(api_key=TAVILY_API_KEY)
+            search_result=tavily_client.search(
+                request.question,
+                max_results=3,
+                search_depth="basic"
+            )
+            web_contents=[]
+            web_sources=[]
+            for r in search_result["results"]:
+                web_contents.append(r["content"])
+                web_sources.append(r["url"])
+
+            context = "\n\n---\n\n".join(web_contents)
+            source_type="web"
+            sources = web_sources
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"网络搜索失败：{e}")
+    else:
+        print(f"RAG分数{best_score}在阈值内，使用PDF内容回答")
+
+        # 把检索到的块组装成上下文,同时收集页码信息
+        context_parts=[]
+        pages_used=set()  
     
-    for chunk in relevant_chunks:
-        context_parts.append(chunk.page_content) # page_content是LangChain文档对象的属性
-        page_num=chunk.metadata.get("page",0)+1  # 页码从0开始，所以+1
-        pages_used.add(page_num)
+        for chunk,score in results_with_score:
+            context_parts.append(chunk.page_content) # page_content是LangChain文档对象的属性
+            page_num=chunk.metadata.get("page",0)+1  # 页码从0开始，所以+1
+            pages_used.add(page_num)
 
-    context = "\n\n---\n\n".join(context_parts)
-    sources = sorted(list(pages_used))
+        context = "\n\n---\n\n".join(context_parts)
+        source_type="pdf"
+        sources = sorted(list(pages_used))
 
+    # 对话历史
     history_text=""
-    for msg in request.history[-6:]:  # 只保留最近6条对话历史
+    for msg in request.history[-6:]:  # 只保留最近6条
         role_label="Student" if msg.role=="user" else "Assistant"
         if msg.role == "assistant" and msg.sources:
-            sources_label = f"(Source from Pages： {', '.join(str(p) for p in msg.sources)} )"
-            history_text += f"{role_label}{sources_label}: {msg.content}\n"
+            history_text += f"{role_label}(from{msg.source_type}): {msg.content}\n"
         else:
             history_text += f"{role_label}: {msg.content}\n"
 
+    # 提示词
+    if source_type == "pdf":
+        source_hint = "以下内容来自学生上传的讲义PDF："
+    else:
+        source_hint = "以下内容来自网络搜索（讲义中未找到相关内容）："
+
     prompt = f"""You are an learning assistant that helps answer questions based on the content of a PDF document. 
-            Here are the relevant chunks:{context} 
+            {source_hint}{context}
             {'Here are the recent conversation history:'+history_text if history_text else ''}
-            please answer the following question in Chinese based on the above content: {request.question}
-            if it's not in the content, say "Sorry, I don't know the answer to that question based on the provided PDF."""
+            please answer the following question in Chinese based on the above content: {request.question}"""
     
-    sources_line = json.dumps({"sources": sources})  + "\n"  # 将页码列表转换为JSON字符串
 
     async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
@@ -103,8 +144,10 @@ async def ask_question(request: QuestionRequest):
     return {
         "question": request.question,
         "answer": result["response"],
+        "source_type": source_type,
         "sources": sources
     }
+
 
 
 class PreviewRequest(BaseModel):
@@ -175,8 +218,8 @@ async def generate_preview(request: PreviewRequest):
         }
         )
 
-    result = response.json()
-    raw_text = result["response"].strip()
+    result = response.json() # 返回的是Ollama整个API响应的Python字典
+    raw_text = result["response"].strip() # 取出AI生成的JSON格式文本并去除首尾空白
 
     try:
         preview_data = json.loads(raw_text)
