@@ -1,30 +1,128 @@
-# EduPrep Project State
+# EduPrep 📚
 
-## Project Overview
-EduPrep is an AI-based learning platform for international students in Germany.
-It follows a structured learning flow: Preview → Learn → Review.
+An AI-powered learning platform for international students in Germany, designed to reduce language barriers and support structured learning through a **Preview → Learn → Review** cycle.
 
-Current phase: Early-stage architecture & system design.
+---
 
-## Completed Work
-- FastAPI + PDF提取 + Ollama问答 + React基础界面
+## Features
 
-## In Progress
-- RAG
+### 📋 Preview Mode
+- Upload a lecture PDF and automatically generate a **bilingual summary** (German + Chinese)
+- Extract and display the **10 most important technical terms** from the lecture
 
-## Next Steps
-- RAG向量搜索: 用 unstructured 替换 PyPDF2，把PDF切成小块，存入ChromaDB向量数据库, langchain + chromadb
-- 把现有的 /ask 接口改成真正的 RAG：提问时语义检索最相关的5-6个段落，回答里附上页码来源。
--  Preview模式: 后端新增 /preview 接口，上传PDF后，自动生成一份双语摘要和关键词汇表, 写好Prompt，让Ollama按照固定格式输出
-- Quiz测验: 后端新增 /quiz 接口，让Ollama根据PDF内容生成测验，用 localStorage 记录答题历史，进度条显示掌握百分比
-- 界面美化1: 用 React Router 拆分成三个独立页面，做左侧导航栏，显示三个模式（Preview / Learn / Review）的切换导航，以及已上传的文件列表。
-- 网络搜索功能和来源引用：Tavily API，回答里标注"来源：讲义第X页"或"来源：网络搜索"。
-- 界面美化2: 安装 Tailwind CSS，三个模式用不同配色区分（Preview 黄色系、Learn 蓝色系、Review 绿色系），加打字机效果和骨架屏加载。
-- 收尾：统一错误处理、Toast 通知、移动端响应式、边界情况测试。
+### 💬 Learn Mode (Q&A)
+- Ask questions about the lecture content in natural language
+- **RAG-based answers**: semantically retrieves the most relevant chunks from the PDF
+- Displays the **source page number** for every answer
+- Maintains **conversation history** so follow-up questions are understood in context
+- **Automatic web search fallback** via Tavily when the answer is not found in the PDF, with clear source labeling
 
+### 🧪 Review Mode (Quiz)
+- Generates **5 multiple-choice questions** based on the lecture content
+- One question at a time with immediate feedback (correct/incorrect)
+- Shows **Chinese explanation** for every answer
+- Displays **score and mastery percentage** upon completion
+- Saves quiz progress to **localStorage** for persistence across sessions
 
-## Key Design Decisions
-- Learning flow is strictly sequential: Preview → Learn → Review
-- AI acts as both tutor and system guide
-- Simplicity is prioritized over feature complexity (MVP first)
+---
 
+## Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| Frontend | React + Vite | Component-based SPA |
+| Backend | FastAPI | Async API server |
+| LLM | Ollama (qwen2.5:3b / qwen3:4b) | Local, offline-capable language model |
+| Embeddings | Ollama (embeddinggemma) | Local vector embeddings |
+| RAG Framework | LangChain | Retrieval-augmented generation pipeline |
+| Vector Database | ChromaDB | Persistent local vector storage |
+| PDF Processing | LangChain PyPDFLoader | Text extraction with page number metadata |
+| Web Search | Tavily API | Fallback search when PDF content is insufficient |
+| Progress Storage | localStorage | No login required |
+
+---
+
+## Architecture
+
+```
+Frontend (React)
+    ↓
+FastAPI Backend
+    ↓
+┌─────────────────────────────────────────┐
+│              API Router                 │
+│   /upload   /preview   /ask   /quiz     │
+└─────────────────────────────────────────┘
+    ↓                        ↓
+RAG Pipeline              Tavily Search
+(LangChain)               (web fallback)
+    ↓
+┌──────────────────────┐
+│  PDF Processor       │  PyPDFLoader → chunk (800 chars, 150 overlap)
+│  Embedding Model     │  Ollama embeddinggemma
+│  ChromaDB            │  Persistent vector storage
+│  LLM                 │  Ollama qwen2.5:3b
+└──────────────────────┘
+```
+
+---
+
+## Project Structure
+
+```
+eduprep/
+├── backend/
+│   ├── main.py              # FastAPI app, all API endpoints
+│   ├── pdf_processor.py     # PDF parsing and chunking
+│   ├── rag.py               # ChromaDB storage and semantic search
+│   ├── chroma_db/           # Persistent vector database (auto-generated)
+│   └── .env                 # API keys (not committed to git)
+├── frontend/
+│   └── src/
+│       └── App.jsx          # React frontend (single page)
+└── README.md
+```
+
+---
+
+## Current Status
+
+| Feature | Status |
+|---|---|
+| PDF upload and chunking | ✅ Complete |
+| ChromaDB vector storage | ✅ Complete |
+| RAG semantic search | ✅ Complete |
+| Source page citation | ✅ Complete |
+| Conversation history | ✅ Complete |
+| Preview mode (bilingual summary) | ✅ Complete |
+| Preview mode (vocabulary list) | ✅ Complete |
+| Learn mode (Q&A) | ✅ Complete |
+| Tavily web search fallback | ✅ Complete |
+| Review mode (quiz generation) | ✅ Complete |
+| Quiz scoring and progress bar | ✅ Complete |
+| localStorage progress saving | ✅ Complete |
+| UI redesign (Tailwind) | 🔲 Planned (Day 10) |
+| Multi-file management | 🔲 Planned |
+| User authentication | 🔲 Optional |
+
+---
+
+## Design Principles
+
+- **Offline-first**: All AI components run locally via Ollama, no API costs during normal use
+- **No login required**: Learning progress stored in browser localStorage
+- **Language accessible**: Bilingual output (German + Chinese) for international students
+- **Privacy-friendly**: PDFs and conversation data never leave the local machine
+
+---
+
+## Known Limitations
+
+- RAG relevance threshold (currently `1.1`) may misclassify edge cases; an LLM-based confidence detection approach is planned
+- Local LLM response time is 15–60 seconds depending on hardware
+- PDF pages that are scanned images cannot be parsed (text-based PDFs only)
+- Conversation history and uploaded file references are lost on page refresh
+
+---
+
+*Built as a personal project — EduPrep is currently in active development.*
