@@ -1,7 +1,7 @@
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import tempfile
-import os # operating system：Python内置的标准库，提供了一系列和操作系统交互的功能
+import os 
 
 def process_pdf(file_bytes: bytes, filename:str) -> list:
     """

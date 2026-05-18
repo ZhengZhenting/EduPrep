@@ -2,10 +2,9 @@ from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 import os
 
-# ChromaDB存储路径（程序关闭后数据不丢失），./ 的意思是"当前目录"，也就是运行 uvicorn 命令时所在的backend文件夹
+# ChromaDB存储路径（程序关闭后数据不丢失），./ 的意思是"当前目录"
 CHROMA_DIR = "./chroma_db" 
 
-# 使用的Embedding模型名（from ollama list）
 EMBEDDING_MODEL = "embeddinggemma:latest"
 
 def get_embedding_function():

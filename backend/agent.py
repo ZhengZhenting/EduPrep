@@ -2,6 +2,8 @@ import httpx
 import json
 import re
 
+# ！！！This file is not used for now ！！！
+
 MODEL="qwen2.5:3b"
 
 async def classify_intent(question:str, rag_chunks:list)->dict:

@@ -1,8 +1,11 @@
+import os
 import re
 import httpx
+from dotenv import load_dotenv
 from langchain_core.tools import tool
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
+load_dotenv()
+OLLAMA_URL = os.getenv("OLLAMA_URL")
 TOOL_MODEL = "qwen2.5:3b"
 
 # Helper functions
@@ -10,7 +13,7 @@ def _strip_think_blocks(text: str) -> str:
     """剥离<think>...</think>块，保留其中的内容，但丢弃块标签和块内的任何文本。"""
     if "</think>" in text:
         text = text.split("</think>")[-1]
-    return text.strip()
+    return text.strip() 
 
 
 def _extract_mermaid_body(raw: str) -> str:    

@@ -19,9 +19,9 @@ from tools import ALL_TOOLS
 # 创建FastAPI应用,测试接口: http://localhost:8000/docs, uvicorn running on: http://127.0.0.1:8000
 app = FastAPI()
 
-# 初始化Tavily客户端
 load_dotenv()  # 加载环境变量
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+OLLAMA_URL = os.getenv("OLLAMA_URL")
 
 # 允许前端跨域访问（前后端分离时必须配置）
 app.add_middleware(
@@ -55,7 +55,6 @@ class Message(BaseModel):
     source_type: Optional[str] = "pdf"
 
 
-# 问答接口：RAG检索 → 组装Prompt → LLM回答
 class QuestionRequest(BaseModel):
     filename: str
     question: str
@@ -107,7 +106,7 @@ async def ask_question(request: QuestionRequest):
 
         async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(
-            "http://localhost:11434/api/generate",
+            OLLAMA_URL,
             json={
                 "model": "qwen2.5:3b",
                 "prompt": prompt,
@@ -249,7 +248,7 @@ async def generate_preview(request: PreviewRequest):
     
     async with httpx.AsyncClient(timeout=180.0) as client:
         response = await client.post(
-        "http://localhost:11434/api/generate",
+        OLLAMA_URL,
         json={
             "model": "qwen2.5:3b",
             "prompt": prompt,
@@ -336,7 +335,7 @@ async def generate_quiz(request: QuizRequest):
         
     async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.post(
-                "http://localhost:11434/api/generate",
+                OLLAMA_URL,
                 json={
                     "model": "qwen2.5:3b",
                     "prompt": prompt,

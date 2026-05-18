@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+*.pyo
 chroma_db/
 *.sqlite3
 *.bin
