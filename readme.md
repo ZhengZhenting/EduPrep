@@ -1,68 +1,147 @@
-# EduPrep 📚
+# EduPrep
 
-An AI-powered learning platform for international students in Germany, designed to reduce language barriers and support structured learning through a **Preview → Learn → Review** cycle.
+An AI-powered learning platform for international students in Germany. Reduces language barriers through a structured **Preview → Learn → Review** cycle. All AI components run locally via Ollama — no cloud inference costs, no data sent externally.
 
 ---
 
 ## Features
 
-### 📋 Preview Mode
-- Upload a lecture PDF and automatically generate a **bilingual summary** (German + Chinese)
-- Extract and display the **10 most important technical terms** from the lecture
+### Preview
+Upload a German lecture PDF and automatically receive a bilingual summary (German + Chinese) and a key vocabulary list with translations and examples.
 
-### 💬 Learn Mode (Q&A)
-- Ask questions about the lecture content in natural language
-- **RAG-based answers**: semantically retrieves the most relevant chunks from the PDF
-- Displays the **source page number** for every answer
-- Maintains **conversation history** so follow-up questions are understood in context
-- **Automatic web search fallback** via Tavily when the answer is not found in the PDF, with clear source labeling
+### Learn
+Ask questions about the lecture in natural language. Answers are grounded in the uploaded PDF via RAG-based semantic retrieval. When PDF content is insufficient, the system falls back to live web search via Tavily. A LangChain ReAct Agent enriches responses with diagrams (Mermaid), math formulas (LaTeX/KaTeX), or syntax-highlighted code when relevant.
 
-### 🧪 Review Mode (Quiz)
-- Generates **5 multiple-choice questions** based on the lecture content
-- One question at a time with immediate feedback (correct/incorrect)
-- Shows **Chinese explanation** for every answer
-- Displays **score and mastery percentage** upon completion
-- Saves quiz progress to **localStorage** for persistence across sessions
-
----
-
-## Tech Stack
-
-| Layer | Technology | Purpose |
-|---|---|---|
-| Frontend | React + Vite | Component-based SPA |
-| Backend | FastAPI | Async API server |
-| LLM | Ollama (qwen2.5:3b / qwen3:4b) | Local, offline-capable language model |
-| Embeddings | Ollama (embeddinggemma) | Local vector embeddings |
-| RAG Framework | LangChain | Retrieval-augmented generation pipeline |
-| Vector Database | ChromaDB | Persistent local vector storage |
-| PDF Processing | LangChain PyPDFLoader | Text extraction with page number metadata |
-| Web Search | Tavily API | Fallback search when PDF content is insufficient |
-| Progress Storage | localStorage | No login required |
+### Review
+Generate multiple-choice quiz questions from the lecture content. Questions are presented one at a time with immediate correctness feedback, Chinese explanations, and a mastery progress bar. Quiz results are persisted to localStorage.
 
 ---
 
 ## Architecture
 
 ```
-Frontend (React)
-    ↓
+React Frontend
+      |
 FastAPI Backend
-    ↓
-┌─────────────────────────────────────────┐
-│              API Router                 │
-│   /upload   /preview   /ask   /quiz     │
-└─────────────────────────────────────────┘
-    ↓                        ↓
-RAG Pipeline              Tavily Search
-(LangChain)               (web fallback)
-    ↓
-┌──────────────────────┐
-│  PDF Processor       │  PyPDFLoader → chunk (800 chars, 150 overlap)
-│  Embedding Model     │  Ollama embeddinggemma
-│  ChromaDB            │  Persistent vector storage
-│  LLM                 │  Ollama qwen2.5:3b
-└──────────────────────┘
+      |
+  ┌───┴────────────┐
+  |                |
+RAG Pipeline    LangChain ReAct Agent
+  |                |
+ChromaDB        Tools: Mermaid / KaTeX / highlight.js
+  |
+Ollama (LLM: qwen2.5:7b, Embeddings: embeddinggemma)
+      |
+Tavily Search API  (web fallback when RAG score >= 1.1)
+```
+
+**Request flow for /ask:**
+
+1. Semantic search over ChromaDB — always executes, retrieves top-k chunks with page metadata
+2. Score routing — cosine distance < 1.1 uses PDF content; >= 1.1 triggers Tavily web search
+3. LangChain ReAct Agent — decides whether to invoke a tool (max 1 per response, enforced via prompt + `max_iterations=3`)
+4. Two-part response — PDF citation block (raw source with page reference) + agent supplement
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, Vite |
+| Backend | FastAPI, Python 3.11 |
+| LLM | Ollama — qwen2.5:7b |
+| Embeddings | Ollama — embeddinggemma |
+| RAG | LangChain, ChromaDB |
+| Agent | LangChain ReAct Agent |
+| Web Search | Tavily API |
+| Database | PostgreSQL + SQLAlchemy (planned) |
+| Task Queue | Celery + Redis (planned) |
+| Auth | JWT + bcrypt (planned) |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.10+
+- Node.js 18+
+- [Ollama](https://ollama.com)
+
+### 1. Pull required models
+
+```bash
+ollama pull qwen2.5:7b
+ollama pull embeddinggemma
+```
+
+### 2. Backend setup
+
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+
+pip install fastapi uvicorn python-multipart pypdf \
+    langchain langchain-community langchain-chroma \
+    langchain-ollama langchain-text-splitters \
+    chromadb tavily-python python-dotenv httpx
+```
+
+Create `backend/.env`:
+
+```
+TAVILY_API_KEY=tvly-your-key-here
+```
+
+Start the server:
+
+```bash
+uvicorn main:app --reload
+# Interactive API docs: http://localhost:8000/docs
+```
+
+### 3. Frontend setup
+
+```bash
+cd frontend
+npm install
+npm run dev
+# Application: http://localhost:5173
+```
+
+---
+
+## API Reference
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/upload` | Upload PDF, parse into chunks, embed and store in ChromaDB |
+| POST | `/preview` | Generate bilingual summary and vocabulary list |
+| POST | `/ask` | RAG Q&A with Agent tool support and web search fallback |
+| POST | `/quiz` | Generate multiple-choice questions from PDF content |
+
+**POST /ask — request**
+```json
+{
+  "question": "Was ist Prompt Engineering?",
+  "filename": "VL-06-Prompting.pdf",
+  "history": [
+    { "role": "user", "content": "...", "sources": [] },
+    { "role": "assistant", "content": "...", "sources": [3, 5] }
+  ]
+}
+```
+
+**POST /ask — response**
+```json
+{
+  "question": "Was ist Prompt Engineering?",
+  "answer": "...",
+  "source_type": "pdf",
+  "sources": [3, 5, 7]
+}
 ```
 
 ---
@@ -72,57 +151,58 @@ RAG Pipeline              Tavily Search
 ```
 eduprep/
 ├── backend/
-│   ├── main.py              # FastAPI app, all API endpoints
-│   ├── pdf_processor.py     # PDF parsing and chunking
-│   ├── rag.py               # ChromaDB storage and semantic search
-│   ├── chroma_db/           # Persistent vector database (auto-generated)
-│   └── .env                 # API keys (not committed to git)
+│   ├── main.py             # FastAPI app, all API endpoints
+│   ├── pdf_processor.py    # PDF parsing, chunking (800 chars, 300 overlap)
+│   ├── rag.py              # ChromaDB storage, semantic search, score routing
+│   ├── tools.py            # LangChain Tool definitions
+│   ├── agent.py            # LangChain ReAct Agent
+│   ├── chroma_db/          # Persistent vector store (auto-generated, gitignored)
+│   └── .env                # Environment variables (gitignored)
 ├── frontend/
 │   └── src/
-│       └── App.jsx          # React frontend (single page)
+│       └── App.jsx         # React single-page application
+├── CLAUDE.md               # Project context for Claude Code
 └── README.md
 ```
 
 ---
 
-## Current Status
+## Design Decisions
 
-| Feature | Status |
-|---|---|
-| PDF upload and chunking | ✅ Complete |
-| ChromaDB vector storage | ✅ Complete |
-| RAG semantic search | ✅ Complete |
-| Source page citation | ✅ Complete |
-| Conversation history | ✅ Complete |
-| Preview mode (bilingual summary) | ✅ Complete |
-| Preview mode (vocabulary list) | ✅ Complete |
-| Learn mode (Q&A) | ✅ Complete |
-| Tavily web search fallback | ✅ Complete |
-| Review mode (quiz generation) | ✅ Complete |
-| Quiz scoring and progress bar | ✅ Complete |
-| localStorage progress saving | ✅ Complete |
-| UI redesign (Tailwind) | 🔲 Planned (Day 10) |
-| Multi-file management | 🔲 Planned |
-| User authentication | 🔲 Optional |
+**Local-first** — LLM inference and embedding both run via Ollama. The only external call is the optional Tavily web search fallback.
+
+**Score-based routing over LLM classification** — Uses cosine distance threshold (1.1) rather than LLM YES/NO intent classification. Small local models (3–7B) produce unreliable binary judgments; a numeric threshold is deterministic and tunable.
+
+**Agent tool constraints** — Tool docstrings are the primary guardrail against overuse by small models, combined with `max_iterations=3`. This keeps tool invocation purposeful without requiring a larger model.
+
+**German filename handling** — ChromaDB collection names are restricted to `[a-zA-Z0-9._-]`. `sanitize_collection_name()` in `rag.py` normalises German umlauts and special characters before any collection is created or queried.
+
+**Chunk overlap** — `chunk_size=800, chunk_overlap=300`. The larger overlap (previously 150) was necessary to prevent content truncation at chunk boundaries, which caused RAG to miss relevant passages.
 
 ---
 
-## Design Principles
+## Roadmap
 
-- **Offline-first**: All AI components run locally via Ollama, no API costs during normal use
-- **No login required**: Learning progress stored in browser localStorage
-- **Language accessible**: Bilingual output (German + Chinese) for international students
-- **Privacy-friendly**: PDFs and conversation data never leave the local machine
-
----
-
-## Known Limitations
-
-- RAG relevance threshold (currently `1.1`) may misclassify edge cases; an LLM-based confidence detection approach is planned
-- Local LLM response time is 15–60 seconds depending on hardware
-- PDF pages that are scanned images cannot be parsed (text-based PDFs only)
-- Conversation history and uploaded file references are lost on page refresh
+| Phase | Scope | Status |
+|---|---|---|
+| P1 | LangChain ReAct Agent, 3 tools, two-part response format | Backend complete — frontend pending |
+| P2 | PostgreSQL, course management, Celery + Redis async PDF processing, conversation persistence, React Router multi-page layout | Planned |
+| P3 | Observability — Loguru structured logs, Prometheus metrics, Jaeger distributed tracing, Grafana dashboard | Planned |
+| P4 | Notes system (3 types), JWT authentication, session list and export | Planned |
+| P5 | Redis AI response cache, token-bucket rate limiting, Ollama circuit breaker, prompt injection detection, security hardening | Planned |
+| P6 | pytest unit + integration tests (>80% coverage), AI golden dataset regression (cosine similarity), Locust load tests | Planned |
+| P7 | Docker + docker-compose (8 services), GitHub Actions CI/CD, Tailwind CSS, full documentation | Planned |
 
 ---
 
-*Built as a personal project — EduPrep is currently in active development.*
+## Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `TAVILY_API_KEY` | Yes | Tavily Search API key — obtain at [tavily.com](https://tavily.com) |
+
+---
+
+## License
+
+MIT

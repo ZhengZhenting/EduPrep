@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import AnswerRenderer from './AnswerRenderer'
 
 const API = 'http://localhost:8000'  // 对接后端API地址
 
@@ -209,262 +210,265 @@ function App() {
 
 
 
-// HTML
-return (
-  <div style={styles.container}>
-    <h1 style={styles.title}>📚 EduPrep</h1>
+  // HTML
+  return (
+    <div style={styles.container}>
+      <h1 style={styles.title}>📚 EduPrep</h1>
 
-    {/* 上传区域 */}
-    <div style={styles.card}>
-      <h2 style={styles.cardTitle}>Upload PDF</h2>
-      <input type="file" accept=".pdf" onChange={handleUpload} disabled={uploading} />
-      {uploadStatus && <p style={styles.status}>{uploadStatus}</p>}
-    </div>
-
-    {/* Preview 触发按钮 */}
-    <div style={styles.card}>
-      <h2 style={styles.cardTitle}>Preview Mode</h2>
-      <p style={{ fontSize: 14, color: '#666', marginBottom: 12, marginTop: 0 }}>
-        Automatically generate lecture notes summary and key vocabulary list
-      </p>
-      <button
-        onClick={handlePreview}
-        disabled={!filename || previewing}
-        style={!filename || previewing ? styles.btnDisabled : styles.btn}
-      >
-        {previewing ? 'Generating, please wait...' : 'Generate Preview'}
-      </button>
-    </div>
-
-    {/* Preview 结果 */}
-    {previewData && (
+      {/* 上传区域 */}
       <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Upload PDF</h2>
+        <input type="file" accept=".pdf" onChange={handleUpload} disabled={uploading} />
+        {uploadStatus && <p style={styles.status}>{uploadStatus}</p>}
+      </div>
 
-        {/* 双语摘要 */}
-        <h2 style={styles.cardTitle}>Summary</h2>
+      {/* Preview 触发按钮 */}
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Preview Mode</h2>
+        <p style={{ fontSize: 14, color: '#666', marginBottom: 12, marginTop: 0 }}>
+          Automatically generate lecture notes summary and key vocabulary list
+        </p>
+        <button
+          onClick={handlePreview}
+          disabled={!filename || previewing}
+          style={!filename || previewing ? styles.btnDisabled : styles.btn}
+        >
+          {previewing ? 'Generating, please wait...' : 'Generate Preview'}
+        </button>
+      </div>
 
-        <div style={styles.summaryBox}>
-          <p style={styles.summaryLabel}>🇩🇪 Deutsch</p>
-          <p style={styles.summaryText}>{previewData.summary_de}</p>
+      {/* Preview 结果 */}
+      {previewData && (
+        <div style={styles.card}>
+
+          {/* 双语摘要 */}
+          <h2 style={styles.cardTitle}>Summary</h2>
+
+          <div style={styles.summaryBox}>
+            <p style={styles.summaryLabel}>🇩🇪 Deutsch</p>
+            <p style={styles.summaryText}>{previewData.summary_de}</p>
+          </div>
+
+          <div style={{ ...styles.summaryBox, background: '#f0f9ff' }}>
+            <p style={styles.summaryLabel}>🇨🇳 中文</p>
+            <p style={styles.summaryText}>{previewData.summary_zh}</p>
+          </div>
+
+          {/* 词汇列表 */}
+          <h2 style={{ ...styles.cardTitle, marginTop: 24 }}>🔑 Key Words</h2>
+
+          <div style={styles.vocabList}>
+            {previewData.vocabulary.map((item, index) => (
+              <div key={index} style={styles.vocabCard}>
+                {typeof item === 'string' ? item : item.term}
+              </div>
+            ))}
+          </div>
         </div>
+      )}
 
-        <div style={{ ...styles.summaryBox, background: '#f0f9ff' }}>
-          <p style={styles.summaryLabel}>🇨🇳 中文</p>
-          <p style={styles.summaryText}>{previewData.summary_zh}</p>
-        </div>
-
-        {/* 词汇列表 */}
-        <h2 style={{ ...styles.cardTitle, marginTop: 24 }}>🔑 Key Words</h2>
-
-        <div style={styles.vocabList}>
-          {previewData.vocabulary.map((item, index) => (
-            <div key={index} style={styles.vocabCard}>
-              {typeof item === 'string' ? item : item.term}
+      {/* 对话历史 */}
+      {history.length > 0 && (
+        <div style={styles.card}>
+          <div style={styles.historyHeader}>
+            <h2 style={styles.cardTitle}>Dialogue</h2>
+            <button onClick={handleClear} style={styles.clearBtn}>Clear</button>
+          </div>
+          {history.map((msg, i) => (
+            <div key={i} style={msg.role === 'user' ? styles.userMsg : styles.aiMsg}>
+              <strong>{msg.role === 'user' ? 'You' : 'AI'}：</strong>
+              {msg.role === 'user'
+                ? msg.content
+                : <AnswerRenderer text={msg.content} />
+              }
+              {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
+                <div style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>
+                  📄 Sources from Page： {msg.sources.join('、')}
+                </div>
+              )}
             </div>
           ))}
         </div>
-      </div>
-    )}
+      )}
 
-    {/* 对话历史 */}
-    {history.length > 0 && (
-      <div style={styles.card}>
-        <div style={styles.historyHeader}>
-          <h2 style={styles.cardTitle}>Dialogue</h2>
-          <button onClick={handleClear} style={styles.clearBtn}>Clear</button>
+      {/* 当前回答 */}
+      {(answer || asking) && (
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>
+            AI Answer
+            {asking && <span style={{ color: '#9ca3af' }}> Thinking...</span>}
+          </h2>
+          {sources.length > 0 && (
+            <p style={styles.sources}>
+              📄 Sources from Page： {sources.join('、')}
+            </p>
+          )}
+          <AnswerRenderer text={answer} />
         </div>
-        {history.map((msg, i) => (
-          <div key={i} style={msg.role === 'user' ? styles.userMsg : styles.aiMsg}>
-            <strong>{msg.role === 'user' ? 'You' : 'AI'}：</strong>
-            {msg.content}
-            {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
-              <div style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>
-                📄 Sources from Page： {msg.sources.join('、')}
+      )}
+
+      {/* 输入框 */}
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Ask a Question</h2>
+        <input
+          value={question}
+          onChange={e => setQuestion(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={filename ? 'Enter your question, then press Enter...' : 'Please upload a PDF first'}
+          disabled={asking || !filename}
+          style={styles.input}
+        />
+        <button
+          onClick={handleAsk}
+          disabled={asking || !filename}
+          style={asking || !filename ? styles.btnDisabled : styles.btn}
+        >
+          {asking ? 'Answering...' : 'Ask'}
+        </button>
+      </div>
+      {/* Review 模式 */}
+      <div style={styles.card}>
+        <h2 style={styles.cardTitle}>Review Mode</h2>
+        <p style={{ fontSize: 14, color: '#666', marginBottom: 12, marginTop: 0 }}>
+          Generate a quiz based on the lecture content
+        </p>
+        <button
+          onClick={handleStartQuiz}
+          disabled={!filename || loadingQuiz}
+          style={!filename || loadingQuiz ? styles.btnDisabled : styles.btn}
+        >
+          {loadingQuiz ? 'Generating questions...' : 'Start Quiz'}
+        </button>
+      </div>
+
+      {/* Quiz 答题区域 */}
+      {
+        quizQuestions.length > 0 && !quizFinished && (
+          <div style={styles.card}>
+
+            {/* 进度显示 */}
+            <div style={styles.quizProgress}>
+              <span style={styles.quizProgressText}>
+                Question {currentIndex + 1} of {quizQuestions.length}
+              </span>
+              <span style={styles.quizScore}>
+                Current Score: {score} / {currentIndex}
+              </span>
+            </div>
+
+            {/* 进度条 */}
+            <div style={styles.progressBarBg}>
+              <div style={{
+                ...styles.progressBarFill,
+                width: `${(currentIndex / quizQuestions.length) * 100}%`
+              }} />
+            </div>
+
+            {/* 题目 */}
+            <p style={styles.quizQuestion}>
+              {quizQuestions[currentIndex].question}
+            </p>
+
+            {/* 选项 */}
+            <div style={styles.optionsList}>
+              {Object.entries(quizQuestions[currentIndex].options).map(([key, value]) => {
+
+                // 根据答题状态决定每个选项的颜色
+                let optionStyle = styles.optionBtn
+                if (showResult) {
+                  if (key === quizQuestions[currentIndex].answer) {
+                    optionStyle = styles.optionCorrect   // 正确答案显示绿色
+                  } else if (key === selectedOption) {
+                    optionStyle = styles.optionWrong     // 选错了显示红色
+                  }
+                } else if (key === selectedOption) {
+                  optionStyle = styles.optionSelected      // 选中但还没判断
+                }
+
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleSelectOption(key)}
+                    disabled={showResult}
+                    style={optionStyle}
+                  >
+                    <strong>{key}.</strong> {value}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* 解析（选完才显示） */}
+            {showResult && (
+              <div style={styles.explanation}>
+                <strong>
+                  {selectedOption === quizQuestions[currentIndex].answer
+                    ? '✅ Answer is correct!'
+                    : `❌ Answer is wrong, the correct answer is ${quizQuestions[currentIndex].answer}`
+                  }
+                </strong>
+                <p style={{ margin: '8px 0 0 0', fontSize: 14 }}>
+                  {quizQuestions[currentIndex].explanation}
+                </p>
               </div>
             )}
+
+            {/* 下一题按钮 */}
+            {showResult && (
+              <button onClick={handleNextQuestion} style={{ ...styles.btn, marginTop: 16 }}>
+                {currentIndex + 1 >= quizQuestions.length ? 'View Results' : 'Next Question →'}
+              </button>
+            )}
           </div>
-        ))}
-      </div>
-    )}
+        )
+      }
 
-    {/* 当前回答 */}
-    {(answer || asking) && (
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>
-          AI Answer
-          {asking && <span style={{ color: '#9ca3af' }}> Thinking...</span>}
-        </h2>
-        {sources.length > 0 && (
-          <p style={styles.sources}>
-            📄 Sources from Page： {sources.join('、')}
-          </p>
-        )}
-        <p style={styles.answerText}>{answer}</p>
-      </div>
-    )}
+      {/* Quiz 完成结果页 */}
+      {
+        quizFinished && (
+          <div style={styles.card}>
+            <h2 style={styles.cardTitle}>🎉 Quiz Completed!</h2>
 
-    {/* 输入框 */}
-    <div style={styles.card}>
-      <h2 style={styles.cardTitle}>Ask a Question</h2>
-      <input
-        value={question}
-        onChange={e => setQuestion(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={filename ? 'Enter your question, then press Enter...' : 'Please upload a PDF first'}
-        disabled={asking || !filename}
-        style={styles.input}
-      />
-      <button
-        onClick={handleAsk}
-        disabled={asking || !filename}
-        style={asking || !filename ? styles.btnDisabled : styles.btn}
-      >
-        {asking ? 'Answering...' : 'Ask'}
-      </button>
-    </div>
-    {/* Review 模式 */ }
-<div style={styles.card}>
-  <h2 style={styles.cardTitle}>Review Mode</h2>
-  <p style={{ fontSize: 14, color: '#666', marginBottom: 12, marginTop: 0 }}>
-    Generate a quiz based on the lecture content
-  </p>
-  <button
-    onClick={handleStartQuiz}
-    disabled={!filename || loadingQuiz}
-    style={!filename || loadingQuiz ? styles.btnDisabled : styles.btn}
-  >
-    {loadingQuiz ? 'Generating questions...' : 'Start Quiz'}
-  </button>
-</div>
+            {/* 得分 */}
+            <div style={styles.scoreDisplay}>
+              <span style={styles.scoreBig}>{score}</span>
+              <span style={styles.scoreTotal}> / {quizQuestions.length}</span>
+            </div>
 
-{/* Quiz 答题区域 */ }
-{
-  quizQuestions.length > 0 && !quizFinished && (
-    <div style={styles.card}>
+            {/* 掌握百分比 */}
+            <p style={{ textAlign: 'center', fontSize: 15, color: '#555', marginBottom: 16 }}>
+              Mastery Level: {Math.round((score / quizQuestions.length) * 100)}%
+            </p>
 
-      {/* 进度显示 */}
-      <div style={styles.quizProgress}>
-        <span style={styles.quizProgressText}>
-          Question {currentIndex + 1} of {quizQuestions.length}
-        </span>
-        <span style={styles.quizScore}>
-          Current Score: {score} / {currentIndex}
-        </span>
-      </div>
+            {/* 掌握程度进度条 */}
+            <div style={styles.progressBarBg}>
+              <div style={{
+                ...styles.progressBarFill,
+                width: `${(score / quizQuestions.length) * 100}%`,
+                background: score / quizQuestions.length >= 0.8 ? '#16a34a' : '#2563eb'
+              }} />
+            </div>
 
-      {/* 进度条 */}
-      <div style={styles.progressBarBg}>
-        <div style={{
-          ...styles.progressBarFill,
-          width: `${(currentIndex / quizQuestions.length) * 100}%`
-        }} />
-      </div>
+            {/* 评价文字 */}
+            <p style={{ textAlign: 'center', fontSize: 14, color: '#666', margin: '16px 0' }}>
+              {score / quizQuestions.length >= 0.8
+                ? '🌟 Great job!'
+                : score / quizQuestions.length >= 0.6
+                  ? '📖 Keep studying to improve'
+                  : '💪 Consider reviewing this material'
+              }
+            </p>
 
-      {/* 题目 */}
-      <p style={styles.quizQuestion}>
-        {quizQuestions[currentIndex].question}
-      </p>
-
-      {/* 选项 */}
-      <div style={styles.optionsList}>
-        {Object.entries(quizQuestions[currentIndex].options).map(([key, value]) => {
-
-          // 根据答题状态决定每个选项的颜色
-          let optionStyle = styles.optionBtn
-          if (showResult) {
-            if (key === quizQuestions[currentIndex].answer) {
-              optionStyle = styles.optionCorrect   // 正确答案显示绿色
-            } else if (key === selectedOption) {
-              optionStyle = styles.optionWrong     // 选错了显示红色
-            }
-          } else if (key === selectedOption) {
-            optionStyle = styles.optionSelected      // 选中但还没判断
-          }
-
-          return (
-            <button
-              key={key}
-              onClick={() => handleSelectOption(key)}
-              disabled={showResult}
-              style={optionStyle}
-            >
-              <strong>{key}.</strong> {value}
+            <button onClick={handleRestartQuiz} style={styles.btn}>
+              Try Again
             </button>
-          )
-        })}
-      </div>
-
-      {/* 解析（选完才显示） */}
-      {showResult && (
-        <div style={styles.explanation}>
-          <strong>
-            {selectedOption === quizQuestions[currentIndex].answer
-              ? '✅ Answer is correct!'
-              : `❌ Answer is wrong, the correct answer is ${quizQuestions[currentIndex].answer}`
-            }
-          </strong>
-          <p style={{ margin: '8px 0 0 0', fontSize: 14 }}>
-            {quizQuestions[currentIndex].explanation}
-          </p>
-        </div>
-      )}
-
-      {/* 下一题按钮 */}
-      {showResult && (
-        <button onClick={handleNextQuestion} style={{ ...styles.btn, marginTop: 16 }}>
-          {currentIndex + 1 >= quizQuestions.length ? 'View Results' : 'Next Question →'}
-        </button>
-      )}
+          </div>
+        )
+      }
     </div>
+
   )
 }
-
-{/* Quiz 完成结果页 */ }
-{
-  quizFinished && (
-    <div style={styles.card}>
-      <h2 style={styles.cardTitle}>🎉 Quiz Completed!</h2>
-
-      {/* 得分 */}
-      <div style={styles.scoreDisplay}>
-        <span style={styles.scoreBig}>{score}</span>
-        <span style={styles.scoreTotal}> / {quizQuestions.length}</span>
-      </div>
-
-      {/* 掌握百分比 */}
-      <p style={{ textAlign: 'center', fontSize: 15, color: '#555', marginBottom: 16 }}>
-        Mastery Level: {Math.round((score / quizQuestions.length) * 100)}%
-      </p>
-
-      {/* 掌握程度进度条 */}
-      <div style={styles.progressBarBg}>
-        <div style={{
-          ...styles.progressBarFill,
-          width: `${(score / quizQuestions.length) * 100}%`,
-          background: score / quizQuestions.length >= 0.8 ? '#16a34a' : '#2563eb'
-        }} />
-      </div>
-
-      {/* 评价文字 */}
-      <p style={{ textAlign: 'center', fontSize: 14, color: '#666', margin: '16px 0' }}>
-        {score / quizQuestions.length >= 0.8
-          ? '🌟 Great job!'
-          : score / quizQuestions.length >= 0.6
-            ? '📖 Keep studying to improve'
-            : '💪 Consider reviewing this material'
-        }
-      </p>
-
-      <button onClick={handleRestartQuiz} style={styles.btn}>
-        Try Again
-      </button>
-    </div>
-  )
-}
-  </div>
-        
-    )
-  }
 
 
 
