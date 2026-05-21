@@ -45,15 +45,41 @@ function App() {
       })
       const data = await res.json()
       setFilename(data.filename)  //这里取出 filename 存起来，因为下面提问时需要告诉后端是哪个文件
-      setUploadStatus(`File ${data.filename} successfully uploaded, ${data.chunks} chunks in total`) //后端返回的JSON里面的字段见后端的 upload() 函数 return {'filename': filename, 'chunks': num_chunks......}
+      setUploadStatus(`File ${data.filename} start uploading`) //后端返回的JSON里面的字段见后端的 upload() 函数 return {'filename': filename, 'chunks': num_chunks......}
       setHistory([]) //上传新文件后清空对话历史
+      pollUploadStatus(data.filename) //开始轮询上传状态，直到后端处理完这个文件
     } catch (err) {
       setUploadStatus(`Upload failed: ${err.message}`)
+      setUploading(false)
     }
 
     setUploading(false)
   }
 
+  const pollUploadStatus = (filename) => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API}/upload/status/${encodeURIComponent(filename)}`)
+        const data = await res.json()
+
+        if (data.status === "done") {
+          clearInterval(interval)
+          setUploadStatus(`✅ ${filename} ready — ${data.chunks} chunks`)
+          setUploading(false)
+        } else if (data.status === "error") {
+          clearInterval(interval)
+          setUploadStatus(`❌ Processing failed: ${data.message}`)
+          setUploading(false)
+        } else {
+          setUploadStatus(`Processing PDF... ${data.progress}%`)
+        }
+      } catch (err) {
+        clearInterval(interval)
+        setUploadStatus(`Error checking status: ${err.message}`)
+        setUploading(false)
+      }
+    }, 2000) // ask every 2 seconds
+  }
 
   // 处理提问Ask
   const handleAsk = async () => {
@@ -138,7 +164,7 @@ function App() {
 
   // 生成Quiz题目
   const handleStartQuiz = async () => {
-    if (!filename || loadingQuiz) return
+    if (!filename || loadingQuiz || uploading) return
 
     setLoadingQuiz(true)
     setQuizQuestions([])
@@ -230,8 +256,8 @@ function App() {
         </p>
         <button
           onClick={handlePreview}
-          disabled={!filename || previewing}
-          style={!filename || previewing ? styles.btnDisabled : styles.btn}
+          disabled={!filename || previewing || uploading}
+          style={!filename || previewing || uploading ? styles.btnDisabled : styles.btn}
         >
           {previewing ? 'Generating, please wait...' : 'Generate Preview'}
         </button>
@@ -323,13 +349,14 @@ function App() {
           onChange={e => setQuestion(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={filename ? 'Enter your question, then press Enter...' : 'Please upload a PDF first'}
-          disabled={asking || !filename}
+          disabled={asking || !filename || uploading}
+          placeholder={uploading ? 'Please wait, processing PDF...' : filename ? 'Enter your question...' : 'Please upload a PDF first'}
           style={styles.input}
         />
         <button
           onClick={handleAsk}
-          disabled={asking || !filename}
-          style={asking || !filename ? styles.btnDisabled : styles.btn}
+          disabled={asking || !filename || uploading}
+          style={asking || !filename || uploading ? styles.btnDisabled : styles.btn}
         >
           {asking ? 'Answering...' : 'Ask'}
         </button>
@@ -342,8 +369,8 @@ function App() {
         </p>
         <button
           onClick={handleStartQuiz}
-          disabled={!filename || loadingQuiz}
-          style={!filename || loadingQuiz ? styles.btnDisabled : styles.btn}
+          disabled={!filename || loadingQuiz || uploading}
+          style={!filename || loadingQuiz || uploading ? styles.btnDisabled : styles.btn}
         >
           {loadingQuiz ? 'Generating questions...' : 'Start Quiz'}
         </button>

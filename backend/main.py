@@ -10,6 +10,8 @@ import os
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
 from typing import List
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from pdf_processor import process_pdf
 from rag import store_chunks, search_chunks, search_chunks_with_score
@@ -85,19 +87,50 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+upload_progress = {}
+executor = ThreadPoolExecutor()
+
 # 上传PDF接口：解析PDF → 切块 → 存ChromaDB
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
     
-    content = await file.read() 
-    chunks=process_pdf(content, file.filename)  
-    store_chunks(chunks, file.filename) 
+    content = await file.read()  
+    filename=file.filename
+    upload_progress[filename] = {"status": "processing", "progress": 0}
+
+    asyncio.get_event_loop().run_in_executor(
+        executor,
+        process_pdf_background,
+        content,
+        filename
+    )
 
     return {
-        "message": "PDF uploaded and text extracted successfully!",
-        "filename": file.filename, 
-        "chunks": len(chunks)
-    }  
+        "message": "Upload received, processing started.",
+        "filename": filename,
+        "status": "processing"
+    }
+
+def process_pdf_background(content:bytes, filename:str):
+
+    try:
+        upload_progress[filename] = {"status": "processing", "progress": 10}
+        chunks = process_pdf(content, filename)
+        upload_progress[filename] = {"status": "processing", "progress": 50}
+        store_chunks(chunks, filename)
+        upload_progress[filename] = {"status": "done", "progress": 100, "chunks": len(chunks)}
+        print(f"PDF processing complete: {filename}, {len(chunks)} chunks")
+    except Exception as e:
+        print(f"Error occurred while processing PDF: {e}")
+        upload_progress[filename] = {"status": "error", "progress": 0,"message": str(e)}
+        print(f"PDF processing error: {e}")
+
+@app.get("/upload/status/{filename}")
+async def get_upload_status(filename: str):
+    if filename not in upload_progress:
+        raise HTTPException(status_code=404, detail="File not found")
+    return upload_progress[filename]
+
 
 @app.post("/ask") 
 async def ask_question(request: QuestionRequest):
