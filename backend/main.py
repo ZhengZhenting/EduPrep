@@ -1,18 +1,73 @@
 from email.mime import message
+from html import parser
 import json
-
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from typing import List, Optional
 from dotenv import load_dotenv
 import anthropic
 import os
+from langchain_core.output_parsers import JsonOutputParser
+from pydantic import BaseModel, Field
+from typing import List
 
 from pdf_processor import process_pdf
 from rag import store_chunks, search_chunks, search_chunks_with_score
-from memory import load_memory, save_memory, compress_history, update_memory, should_compress
+from memory import load_memory, save_memory, compress_history, update_memory, should_compress, load_quiz_memory, save_quiz_memory
 
+# ---------- Requests --------------
+# Preview
+class PreviewRequest(BaseModel):
+    filename: str
+
+# Quiz
+class QuizRequest(BaseModel):
+    filename: str
+    num_questions: int = 5
+
+class QuizResultRequest(BaseModel):
+    filename: str
+    score: int
+    total: int
+
+# ---------- Structured Output Models --------------
+# Preview
+class VocabItem(BaseModel):
+    term: str = Field(description="German technical term")
+    translation: str = Field(description="Chinese translation")
+
+class PreviewResponse(BaseModel):
+    summary_de: str = Field(description="5-sentence summary in German")
+    summary_zh: str = Field(description="5-sentence summary in Chinese")
+    vocabulary: List[VocabItem] = Field(description="10 key technical terms with translations")
+
+# Quiz
+class QuizOption(BaseModel):
+    A: str = Field(description="First option")
+    B: str = Field(description="Second option")
+    C: str = Field(description="Third option")
+    D: str = Field(description="Fourth option")
+
+class QuizQuestion(BaseModel):
+    question: str = Field(description="Question text in German")
+    options: QuizOption = Field(description="Four answer options")
+    answer: str = Field(description="Correct answer: A, B, C, or D")
+    explanation: str = Field(description="Explanation in Chinese")
+
+class QuizResponse(BaseModel):
+    questions: List[QuizQuestion] = Field(description="List of quiz questions")
+
+#----------  History message --------------
+class Message(BaseModel):
+    role: str 
+    content: str
+    sources: Optional[List] = []
+    source_type: Optional[str] = "pdf"
+
+class QuestionRequest(BaseModel):
+    filename: str
+    question: str
+    history: Optional[List[Message]] = []
 
 # 创建FastAPI应用,测试接口: http://localhost:8000/docs, uvicorn running on: http://127.0.0.1:8000
 app = FastAPI()
@@ -38,27 +93,11 @@ async def upload_pdf(file: UploadFile = File(...)):
     chunks=process_pdf(content, file.filename)  
     store_chunks(chunks, file.filename) 
 
-
     return {
         "message": "PDF uploaded and text extracted successfully!",
         "filename": file.filename, 
         "chunks": len(chunks)
-    }
-
-
-# 对话历史的单条格式
-class Message(BaseModel):
-    role: str 
-    content: str
-    sources: Optional[List] = []
-    source_type: Optional[str] = "pdf"
-
-
-class QuestionRequest(BaseModel):
-    filename: str
-    question: str
-    history: Optional[List[Message]] = []  
-
+    }  
 
 @app.post("/ask") 
 async def ask_question(request: QuestionRequest):
@@ -194,8 +233,6 @@ async def ask_question(request: QuestionRequest):
         "relevance": best_score<SCORE_THRESHOLD
     }
 
-class PreviewRequest(BaseModel):
-    filename: str
 
 @app.post("/preview")
 async def generate_preview(request: PreviewRequest):
@@ -205,7 +242,7 @@ async def generate_preview(request: PreviewRequest):
     ]
 
     all_chunks=[]
-    seen_contents=set() # 用于去重，避免同一块被多次添加
+    seen_contents=set() 
 
     for query in queries:
         chunks = search_chunks(query, request.filename, k=3)
@@ -220,63 +257,75 @@ async def generate_preview(request: PreviewRequest):
     context = "\n\n---\n\n".join([c.page_content for c in all_chunks])
     context = context[:2000]
 
-    prompt = f"""/no_think
+    parser = JsonOutputParser(pydantic_object=PreviewResponse)
+
+    prompt = f"""
                 You are an academic assistant helping international students understand lecture materials.
                 Based on the following lecture content, generate a structured preview.
                 Lecture content:
                 {context}
-                Return ONLY a valid JSON object with exactly this structure, no other text before or after:
-                {{
-                    "summary_de": "5 sentences summary in German",
-                    "summary_zh": "5 sentences summary in Chinese",
-                    "vocabulary": [
-                    "Begriff1 (中文)",
-                    "Begriff2 (中文)",
-                    "Begriff3 (中文)",
-                    "Begriff4 (中文)",
-                    "Begriff5 (中文)",
-                    "Begriff6 (中文)",
-                    "Begriff7 (中文)",
-                    "Begriff8 (中文)"
-                    ]
-                }}
-
+                {parser.get_format_instructions()}
+                
                 Rules:
-                - Extract exactly 8 most important technical terms for vocabulary in both German and Chinese, and format them as "Term (Chinese translation)".
-                - Return ONLY the JSON, no markdown, no explanation, no code blocks, no thinking""" 
+                - summary_de: 5 sentences in German
+                - summary_zh: 5 sentences in Chinese
+                - vocabulary: exactly 10 most important technical terms, each with German term and Chinese translation
+                - Output ONLY the JSON, no markdown, no explanation"""
     
     message = claude.messages.create(
         model="claude-sonnet-4-5",
-        max_tokens=500,
+        max_tokens=1000,
         messages=[{"role": "user", "content": prompt}]
     )
 
-    raw_text = message.content[0].text.strip()
-    # 清理可能的 markdown 代码块标记
-    if raw_text.startswith("```"):
-        raw_text = raw_text.split("\n", 1)[-1]
-    if raw_text.endswith("```"):
-        raw_text = raw_text.rsplit("```", 1)[0]
-
     try:
-        preview_data = json.loads(raw_text)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse AI response as JSON: {e}\nRaw: {raw_text}")
+        preview_data = parser.parse(message.content[0].text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse preview response: {e}")
+    
+    vocab_list = []
+    for item in preview_data.get("vocabulary", []):
+        if isinstance(item, dict):
+            vocab_list.append(f"{item.get('term', '')} ({item.get('translation', '')})")
+        else:
+            vocab_list.append(str(item))
 
     return {
         "filename": request.filename,
         "summary_de": preview_data.get("summary_de", ""),
         "summary_zh": preview_data.get("summary_zh", ""),
-        "vocabulary": preview_data.get("vocabulary", [])
+        "vocabulary": vocab_list
     }
 
 
-class QuizRequest(BaseModel):
-    filename: str
-    num_questions: int = 5
-
 @app.post("/quiz")
 async def generate_quiz(request: QuizRequest):
+    # get weak concepts
+    conv_memory = load_memory(request.filename)
+    weak_concepts = conv_memory.get("weak_concepts", [])
+    print(f"weak_concepts: {weak_concepts}")
+
+    # get quiz history scores
+    quiz_memory = load_quiz_memory(request.filename)
+    average_score = quiz_memory.get("average_score", 0.0)
+    print(f"average_score: {average_score}")
+
+    # difficulty estimation
+    if average_score == 0.0:
+        difficulty_hint = "Generate a mix of basic and intermediate questions."
+    elif average_score < 0.6:
+        difficulty_hint = "Focus on basic conceptual questions to strengthen fundamentals."
+    elif average_score >= 0.8:
+        difficulty_hint = "Focus on advanced application and analysis questions."
+    else:
+        difficulty_hint = "Generate a mix of basic and intermediate questions."
+
+    # weak concepts prompt
+    weak_concepts_text = ""
+    if weak_concepts:
+        weak_concepts_text = f"Prioritize questions about these concepts the student is weak on: {', '.join(weak_concepts)}"
+
+    # search for relevant chunks
     queries=[
              "What are the main concepts and definitions?",
              "What are the key technical terms and their applications?",
@@ -284,7 +333,7 @@ async def generate_quiz(request: QuizRequest):
     ]
 
     all_chunks=[]
-    seen_contents=set() # 用于去重，避免同一块被多次添加
+    seen_contents=set()
 
     for query in queries:
             chunks = search_chunks(query, request.filename, k=3)
@@ -299,55 +348,42 @@ async def generate_quiz(request: QuizRequest):
     context = "\n\n---\n\n".join([c.page_content for c in all_chunks])
     context = context[:2500]  
 
-    prompt=f""" You are an learning assistant creating multiple choice questions for students.
-                    Based on the following lecture content, generate exactly {request.num_questions} multiple choice questions in German.
-                    Lecture content:{context}
-                    Return ONLY a valid JSON object with exactly this structure:
-                    {{
-                        "questions": [
-                         {{
-                             "question": "Clear question based on the lecture content",
-                                "options": {{
-                                  "A": "first option",
-                                  "B": "second option",
-                                  "C": "third option",
-                                  "D": "fourth option"
-                               }},
-                                "answer": "A",
-                                "explanation": "Explanation in Chinese why this answer is correct"
-                            }}
-                        ]
-                    }}
-                    Rules:
-                    - Generate exactly {request.num_questions} questions
-                    - Each question must be based strictly on the lecture content
-                    - Only one option is correct
-                    - answer field must be exactly one of: A, B, C, D
-                    - explanation must be in Chinese, 1-2 sentences
-                    - options must cover plausible wrong answers, not obviously wrong
-                    - Return ONLY the JSON, no markdown, no explanation, no code blocks, no thinking"""
+    parser = JsonOutputParser(pydantic_object=QuizResponse)
+
+    prompt=f"""
+            You are a learning assistant creating multiple choice questions for students.
+            Based on the following lecture content, generate exactly {request.num_questions} multiple choice questions in German.
+
+            Lecture content: {context}
+
+            {difficulty_hint} {weak_concepts_text}
+
+            {parser.get_format_instructions()}
+
+            Rules:
+            - Each question must be based strictly on the lecture content
+            - Questions must be in German
+            - Only one option is correct
+            - answer field must be exactly one of: A, B, C, D
+            - explanation must be in Chinese, 1-2 sentences
+            - Options must cover plausible wrong answers
+            - Output ONLY the JSON, no markdown, no explanation"""
         
     message = claude.messages.create(
         model="claude-sonnet-4-5",
         max_tokens=2000,
         messages=[{"role": "user", "content": prompt}]
     )
-    raw_text = message.content[0].text.strip()
-
-    # 清理可能的 markdown 代码块标记
-    if raw_text.startswith("```"):
-        raw_text = raw_text.split("\n", 1)[-1]
-    if raw_text.endswith("```"):
-        raw_text = raw_text.rsplit("```", 1)[0]
-
+    
     try:
-        quiz_data = json.loads(raw_text)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse AI response as JSON: {e}\nRaw: {raw_text}")
-   
+        quiz_data = parser.parse(message.content[0].text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse quiz response: {e}")
+
     questions=quiz_data.get("questions", [])
     if not questions:
-            raise HTTPException(status_code=500, detail=f"No questions generated. Raw response: {raw_text}")
+            raise HTTPException(status_code=500, detail="No questions generated.")
+    
     return {
             "filename": request.filename,
             "questions": questions
