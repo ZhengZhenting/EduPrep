@@ -213,7 +213,7 @@ function App() {
   // HTML
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>📚 EduPrep</h1>
+      <h1 style={styles.title}>EduPrep</h1>
 
       {/* 上传区域 */}
       <div style={styles.card}>
@@ -255,7 +255,15 @@ function App() {
           </div>
 
           {/* 词汇列表 */}
-          <h2 style={{ ...styles.cardTitle, marginTop: 24 }}>🔑 Key Words</h2>
+          <h2 style={{ ...styles.cardTitle, marginTop: 24 }}>Key Words</h2>
+
+          {/* Mindmap */}
+          {previewData.mindmap && (
+            <div style={styles.card}>
+              <h2 style={styles.cardTitle}>Lecture Structure</h2>
+              <AnswerRenderer text={previewData.mindmap} />
+            </div>
+          )}
 
           <div style={styles.vocabList}>
             {previewData.vocabulary.map((item, index) => (
