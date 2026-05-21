@@ -61,7 +61,6 @@ def should_compress(history: list, memory: dict) -> bool:
     if count == 0 or count % 6 != 0:
         return False
     
-    # 检查最后一次压缩是在第几条时做的
     last_compressed_at = memory.get("last_compressed_at", 0)
     return count > last_compressed_at
 
@@ -157,10 +156,10 @@ def save_quiz_memory(filename: str, score: int, total: int):
         "date": datetime.now().isoformat()
     })
 
-    # 只保留最近5次记录
+    # save recent 5 records
     memory["quiz_history"] = memory["quiz_history"][-5:]
 
-    # 更新平均分
+    # update average score
     if memory["quiz_history"]:
         memory["average_score"] = round(
             sum(r["percentage"] for r in memory["quiz_history"]) / len(memory["quiz_history"]), 2
