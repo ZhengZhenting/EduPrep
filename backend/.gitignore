@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 *.pyo
 chroma_db/
+memory_store/
 *.sqlite3
 *.bin
 .env
