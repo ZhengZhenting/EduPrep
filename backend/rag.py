@@ -2,9 +2,7 @@ from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 import os
 
-# ChromaDB存储路径（程序关闭后数据不丢失），./ 的意思是"当前目录"
 CHROMA_DIR = "./chroma_db" 
-
 EMBEDDING_MODEL = "nomic-embed-text"
 
 def get_embedding_function():
@@ -14,7 +12,6 @@ def get_embedding_function():
     关键点在于存块时用什么Embedding模型，查询时就必须用同一个模型，否则向量空间不一致，查询结果会很差甚至完全不相关
     把它封装成函数，是为了保证两处（store,search）都调用同一个地方
     """
-
     return OllamaEmbeddings(model=EMBEDDING_MODEL)
 
 

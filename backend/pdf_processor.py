@@ -22,7 +22,7 @@ def process_pdf(file_bytes: bytes, filename:str) -> list:
         # 用RecursiveCharacterTextSplitter切块
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=800, 
-            chunk_overlap=300,
+            chunk_overlap=300, # overlap 37.5%，业界常用的经验比例是25%-40%
             separators=["\n\n", "\n", ".", ""]) # 优先在段落、句子的边界处切割，保持语义完整
         chunks = splitter.split_documents(pages) # 这里的输入是LangChain的Document对象列表，每个Document对象都有page_content和metadata属性
 

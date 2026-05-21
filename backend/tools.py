@@ -9,12 +9,6 @@ OLLAMA_URL = os.getenv("OLLAMA_URL")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 # Helper functions
-def _strip_think_blocks(text: str) -> str:
-    """剥离<think>...</think>块，保留其中的内容，但丢弃块标签和块内的任何文本。"""
-    if "</think>" in text:
-        text = text.split("</think>")[-1]
-    return text.strip() 
-
 def _extract_mermaid_body(raw: str) -> str:    
     """从原始文本中提取Mermaid图表的主体内容，去掉可能的Markdown代码块标记和多余的空白。"""
     text = raw.strip()
@@ -46,9 +40,7 @@ def search_web(query: str) -> str:
     except Exception as e:
         return f"Web Search Error: {str(e)}"
 
-
-
-# Tool2:Mermaid Diagram Generator
+# Tool2: Mermaid Diagram Generator
 @tool
 def generate_mermaid_chart(description: str) -> str:
     """Generate a Mermaid diagram from a natural-language description.

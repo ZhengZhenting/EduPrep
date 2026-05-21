@@ -1,5 +1,3 @@
-from email.mime import message
-from html import parser
 import json
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -59,7 +57,7 @@ class QuizQuestion(BaseModel):
 class QuizResponse(BaseModel):
     questions: List[QuizQuestion] = Field(description="List of quiz questions")
 
-#----------  History message --------------
+# ----------  History message --------------
 class Message(BaseModel):
     role: str 
     content: str
@@ -74,7 +72,7 @@ class QuestionRequest(BaseModel):
 # 创建FastAPI应用,测试接口: http://localhost:8000/docs, uvicorn running on: http://127.0.0.1:8000
 app = FastAPI()
 
-load_dotenv()  # 加载环境变量
+load_dotenv() 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -120,6 +118,7 @@ def process_pdf_background(content:bytes, filename:str):
         store_chunks(chunks, filename)
         upload_progress[filename] = {"status": "done", "progress": 100, "chunks": len(chunks)}
         print(f"PDF processing complete: {filename}, {len(chunks)} chunks")
+
     except Exception as e:
         print(f"Error occurred while processing PDF: {e}")
         upload_progress[filename] = {"status": "error", "progress": 0,"message": str(e)}
@@ -134,7 +133,6 @@ async def get_upload_status(filename: str):
 
 @app.post("/ask") 
 async def ask_question(request: QuestionRequest):
-    # 加载用户记忆
     memory = load_memory(request.filename)
 
     # 对话历史

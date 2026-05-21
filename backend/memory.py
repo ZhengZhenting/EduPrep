@@ -6,15 +6,14 @@ from dotenv import load_dotenv
 
 
 MEMORY_DIR = "./memory_store"
-os.makedirs(MEMORY_DIR, exist_ok=True)  # 启动时自动创建目录
+os.makedirs(MEMORY_DIR, exist_ok=True) 
 
 load_dotenv() 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-# ─────────────────────────────────────────────
-# Learning Memory
-# ─────────────────────────────────────────────
+
+# ----------- Learning Memory -----------
 # Data Structure
 def _default_memory() -> dict:
     """返回空记忆的默认结构"""
@@ -26,7 +25,7 @@ def _default_memory() -> dict:
         "last_updated": ""
     }
 
-# load / save
+# load / save memory
 def load_memory(filename: str) -> dict:
     """读取某个PDF对应的用户记忆，文件不存在则返回默认结构"""
     path = _memory_path(filename)
@@ -65,7 +64,7 @@ def should_compress(history: list, memory: dict) -> bool:
     return count > last_compressed_at
 
 def compress_history(history: list, memory: dict) -> str:
-    """把对话历史压缩成一段摘要，返回摘要字符串"""
+    """把对话历史（6条完整对话）压缩成一段摘要，返回摘要字符串"""
     history_text = ""
     for msg in history:
         role_label = "Student" if msg.role == "user" else "Assistant"
@@ -76,7 +75,7 @@ def compress_history(history: list, memory: dict) -> str:
             Output format: Directly output the summary text, without any title or prefix."""   
     message = claude.messages.create(
         model="claude-sonnet-4-5",
-        max_tokens=250,
+        max_tokens=300,
         messages=[{"role": "user", "content": prompt}]
     )
     memory["last_compressed_at"] = len(history)
@@ -107,7 +106,7 @@ def update_memory(filename: str, question: str, answer: str, memory: dict) -> di
     try:
         message = claude.messages.create(
             model="claude-sonnet-4-5",
-            max_tokens=250,
+            max_tokens=100,
             messages=[{"role": "user", "content": prompt}]
         )
         raw = message.content[0].text.strip()
@@ -126,9 +125,7 @@ def update_memory(filename: str, question: str, answer: str, memory: dict) -> di
 
     return memory
 
-# ─────────────────────────────────────────────
-# Quiz Memory
-# ─────────────────────────────────────────────
+# ----------- Quiz Memory -----------
 def _quiz_memory_path(filename: str) -> str:
     safe_name = filename.replace(".", "_").replace(" ", "_")
     return os.path.join(MEMORY_DIR, f"{safe_name}_quiz_memory.json")
