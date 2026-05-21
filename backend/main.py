@@ -259,9 +259,11 @@ async def generate_preview(request: PreviewRequest):
 
     parser = JsonOutputParser(pydantic_object=PreviewResponse)
 
-    prompt = f"""
+    system_prompt = f"""
                 You are an academic assistant helping international students understand lecture materials.
-                Based on the following lecture content, generate a structured preview.
+                Output ONLY a valid JSON object. Do not wrap in markdown code blocks. No explanation."""
+
+    user_prompt = f"""
                 Lecture content:
                 {context}
                 {parser.get_format_instructions()}
@@ -274,13 +276,22 @@ async def generate_preview(request: PreviewRequest):
     
     message = claude.messages.create(
         model="claude-sonnet-4-5",
-        max_tokens=1000,
-        messages=[{"role": "user", "content": prompt}]
+        max_tokens=1200,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_prompt}]
     )
 
+    raw_text = message.content[0].text.strip()
+
+    # clear markdown
+    if raw_text.startswith("```"):
+        raw_text = raw_text.split("\n", 1)[-1]
+    if raw_text.endswith("```"):
+        raw_text = raw_text.rsplit("```", 1)[0].strip()
+
     try:
-        preview_data = parser.parse(message.content[0].text)
-    except Exception as e:
+        preview_data =  json.loads(raw_text)
+    except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse preview response: {e}")
     
     vocab_list = []
@@ -290,11 +301,43 @@ async def generate_preview(request: PreviewRequest):
         else:
             vocab_list.append(str(item))
 
+    # Mindmap
+    system_prompt_mindmap = f"""
+                    You are a Mermaid diagram expert. 
+                    Output ONLY valid Mermaid mindmap syntax. 
+                    No markdown fences, no explanation, no text before or after."""
+    mindmap_prompt = f"""
+                    Generate a Mermaid mindmap showing the structure of this lecture.
+                    Lecture content:{context}
+
+                    Rules:
+                    - Use mindmap type
+                    - Maximum 3 levels deep
+                    - Maximum 15 nodes total
+                    - All labels in German as they appear in the lecture
+                    - Keep node labels short, max 4 words
+                    - Output ONLY the Mermaid syntax, no markdown fences, no explanation"""
+    mindmap_message = claude.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=1000,
+        system=system_prompt_mindmap,
+        messages=[{"role": "user", "content": mindmap_prompt}]
+    )
+    mindmap_raw = mindmap_message.content[0].text.strip()
+    # 清理可能的 markdown 标记
+    if mindmap_raw.startswith("```"):
+        mindmap_raw = mindmap_raw.split("\n", 1)[-1]
+    if mindmap_raw.endswith("```"):
+        mindmap_raw = mindmap_raw.rsplit("```", 1)[0].strip()
+
+    mindmap = f"```mermaid\n{mindmap_raw}\n```"
+
     return {
         "filename": request.filename,
         "summary_de": preview_data.get("summary_de", ""),
         "summary_zh": preview_data.get("summary_zh", ""),
-        "vocabulary": vocab_list
+        "vocabulary": vocab_list,
+        "mindmap": mindmap
     }
 
 
@@ -350,34 +393,45 @@ async def generate_quiz(request: QuizRequest):
 
     parser = JsonOutputParser(pydantic_object=QuizResponse)
 
-    prompt=f"""
+    system_prompt = f""""
             You are a learning assistant creating multiple choice questions for students.
-            Based on the following lecture content, generate exactly {request.num_questions} multiple choice questions in German.
-
+            Output ONLY a valid JSON object. Do not wrap in markdown code blocks. No explanation."""
+    
+    user_prompt=f"""
             Lecture content: {context}
 
-            {difficulty_hint} {weak_concepts_text}
+            {difficulty_hint} 
+            {weak_concepts_text}
 
             {parser.get_format_instructions()}
 
             Rules:
+            - Generate exactly {request.num_questions} questions
             - Each question must be based strictly on the lecture content
             - Questions must be in German
             - Only one option is correct
             - answer field must be exactly one of: A, B, C, D
             - explanation must be in Chinese, 1-2 sentences
-            - Options must cover plausible wrong answers
-            - Output ONLY the JSON, no markdown, no explanation"""
+            - Options must cover plausible wrong answers"""
         
     message = claude.messages.create(
         model="claude-sonnet-4-5",
         max_tokens=2000,
-        messages=[{"role": "user", "content": prompt}]
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_prompt}]
     )
-    
+
+    raw_text = message.content[0].text.strip()
+
+    # 清理 markdown 代码块标记
+    if raw_text.startswith("```"):
+        raw_text = raw_text.split("\n", 1)[-1]
+    if raw_text.endswith("```"):
+        raw_text = raw_text.rsplit("```", 1)[0].strip()
+
     try:
-        quiz_data = parser.parse(message.content[0].text)
-    except Exception as e:
+        quiz_data = json.loads(raw_text)
+    except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse quiz response: {e}")
 
     questions=quiz_data.get("questions", [])
