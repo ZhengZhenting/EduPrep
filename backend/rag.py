@@ -5,7 +5,7 @@ import os
 # ChromaDB存储路径（程序关闭后数据不丢失），./ 的意思是"当前目录"
 CHROMA_DIR = "./chroma_db" 
 
-EMBEDDING_MODEL = "embeddinggemma:latest"
+EMBEDDING_MODEL = "nomic-embed-text"
 
 def get_embedding_function():
     """docstring ：
