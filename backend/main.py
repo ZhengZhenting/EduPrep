@@ -125,7 +125,7 @@ async def ask_question(request: QuestionRequest):
     
     best_score=min(score for _, score in results_with_score)
     print(f"RAG Relevance Score: {best_score}")
-    SCORE_THRESHOLD = 1.15  # 分数阈值：低于1.15说明PDF里有相关内容
+    SCORE_THRESHOLD = 0.9  # 分数阈值：低于0.9说明PDF里有相关内容
 
     weak_concepts_text = ""
     if memory.get("weak_concepts"):
@@ -167,7 +167,7 @@ async def ask_question(request: QuestionRequest):
             {('Conversation history:\n' + history_text) if history_text else ''}
             Student question: {request.question}"""
         
-        message = claude.messages.create(
+        answer = claude.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=400,
             system=system_prompt,
@@ -176,51 +176,82 @@ async def ask_question(request: QuestionRequest):
 
     else:
         print(f"RAG Relevance Score {best_score} above threshold, using web search to answer")
+
+        from tools import CLAUDE_TOOLS, search_web, generate_mermaid_chart
+
+        first_prompt = f"""
+                You are a learning assistant helping international students understand lecture materials.
+                {weak_concepts_text}{learning_style_text}
+
+                Rules:
+                - Always answer in Chinese
+                - Be concise and direct, keep answer under 250 characters
+                - Only call search_web if you need current information to answer the question
+                - Only call generate_mermaid_chart if the question explicitly asks for a diagram
+                - If you can answer directly, do so without calling any tool"""
         
-        try:
-            from tavily import TavilyClient
-            tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
-            search_result = tavily_client.search(
-                request.question,
-                max_results=3,
-                search_depth="basic"
-            )
-            web_contents = []
-            web_sources = []
-            for r in search_result["results"]:
-                web_contents.append(r["content"])
-                web_sources.append(r["url"])
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"网络搜索失败：{e}")
-        
-        context = "\n\n---\n\n".join(web_contents) # 将多个搜索结果用分隔符连接起来，形成一个整体的上下文
-        context = context[:2000]
-        source_type="web" 
-        sources = web_sources
-
-        system_prompt = f"""You are a learning assistant helping international students understand German lecture materials.
-            {weak_concepts_text}{learning_style_text}
-
-            Rules:
-            - Always answer in Chinese
-            - Organize a clear answer based on the search results
-            - Be concise and direct, only address what the question asks, do not list irrelevant supplementary information
-            - Keep the answer under 250 characters
-            - Only output diagrams, formulas, or code blocks if the question explicitly asks for them"""
-
-        user_prompt = f"""Search results: {context}
-
-            {('Conversation history:\n' + history_text) if history_text else ''}
-            Student question: {request.question}"""
-        
-        message = claude.messages.create(
+        first_response = claude.messages.create(
             model="claude-sonnet-4-5",
-            max_tokens=600,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}]
+            max_tokens=500,
+            system=first_prompt,
+            tools=CLAUDE_TOOLS,
+            messages=[{"role": "user", "content": f"Student question: {request.question}"}],
         )
-        
-    answer = message.content[0].text
+
+        tool_results = []
+        source_type = "web"
+        sources = []
+
+        if first_response.stop_reason == "tool_use":
+            for block in first_response.content:
+                if block.type == "tool_use":
+                    tool_name=block.name
+                    tool_input=block.input
+                    print(f"Claude Tool Use: {tool_name}, Parameter: {tool_input}")
+
+                    if tool_name == "search_web":
+                        tool_output = search_web.invoke(tool_input["query"])
+                        sources = []
+                        for line in tool_output.split("\n"):
+                            if line.startswith("from:"):
+                                sources.append(line.replace("from:", "").strip())
+                    elif tool_name == "generate_mermaid_chart":
+                        tool_output = await generate_mermaid_chart.ainvoke(tool_input["description"])
+                        sources = []
+                    else:
+                        tool_output = "Tool not found."
+
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": tool_output
+                    })
+            
+            second_prompt = f"""
+                        You are a learning assistant helping international students understand lecture materials.
+                        {weak_concepts_text}{learning_style_text}
+
+                        Rules:
+                        - Always answer in Chinese
+                        - Be concise and direct, keep answer under 250 characters
+                        - Only output diagrams or formulas if explicitly needed"""
+            second_response = claude.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=500, 
+                system=second_prompt,
+                messages=[
+                    {"role": "user", "content": request.question},
+                    {"role": "assistant", "content": first_response.content},
+                    {"role": "user", "content": tool_results}
+                ]
+            )
+            answer = second_response.content[0].text
+
+        else:
+            print("Claude answered directly without tool use")
+            answer = first_response.content[0].text
+            source_type = "web"
+            sources = []
 
     memory = update_memory(request.filename, request.question, answer, memory)
     save_memory(request.filename, memory)
