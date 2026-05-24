@@ -10,10 +10,15 @@ from pydantic import BaseModel, Field
 from typing import List
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from sqlalchemy.orm import Session
+from fastapi import Depends
+
 
 from pdf_processor import process_pdf
 from rag import store_chunks, search_chunks, search_chunks_with_score
 from memory import load_memory, save_memory, compress_history, update_memory, should_compress, load_quiz_memory, save_quiz_memory
+from database import get_db, SessionLocal
+from models import PdfFile
 
 # ---------- Requests --------------
 # Preview
@@ -57,6 +62,11 @@ class QuizQuestion(BaseModel):
 class QuizResponse(BaseModel):
     questions: List[QuizQuestion] = Field(description="List of quiz questions")
 
+class QuizResultRequest(BaseModel):
+    filename: str
+    score: int
+    total: int
+
 # ----------  History message --------------
 class Message(BaseModel):
     role: str 
@@ -69,7 +79,7 @@ class QuestionRequest(BaseModel):
     question: str
     history: Optional[List[Message]] = []
 
-# 创建FastAPI应用,测试接口: http://localhost:8000/docs, uvicorn running on: http://127.0.0.1:8000
+# create FastAPI application, test: http://localhost:8000/docs, uvicorn running on: http://127.0.0.1:8000
 app = FastAPI()
 
 load_dotenv() 
@@ -77,7 +87,7 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-# 允许前端跨域访问（前后端分离时必须配置）
+# allow CORS for testing, in production specify allowed origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -88,41 +98,76 @@ app.add_middleware(
 upload_progress = {}
 executor = ThreadPoolExecutor()
 
-# 上传PDF接口：解析PDF → 切块 → 存ChromaDB
+# upload PDF：processing PDF → chunks → save in Database and ChromaDB
 @app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
+async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)):
     
     content = await file.read()  
     filename=file.filename
-    upload_progress[filename] = {"status": "processing", "progress": 0}
 
+    existing = db.query(PdfFile).filter(
+        PdfFile.filename==filename,
+        PdfFile.course_id==1
+    ).first() # limit 1
+
+    if existing:
+        pdf_file = existing
+        print(f"PdfFile already exists in database: {filename}")
+    else:
+        pdf_file = PdfFile(
+            course_id=1,
+            filename=filename, 
+            chunk_count=0
+        )
+        db.add(pdf_file)
+        db.commit()
+        db.refresh(pdf_file)
+        print(f"New PdfFile record created in database: {filename}, id: {pdf_file.id}")
+
+    upload_progress[filename] = {"status": "processing", "progress": 0}
     asyncio.get_event_loop().run_in_executor(
         executor,
         process_pdf_background,
         content,
-        filename
+        filename,
+        pdf_file.id
     )
 
     return {
         "message": "Upload received, processing started.",
         "filename": filename,
+        "pdf_file_id": pdf_file.id,
         "status": "processing"
     }
 
-def process_pdf_background(content:bytes, filename:str):
-
+def process_pdf_background(content:bytes, filename:str, pdf_file_id: int):
+    db = SessionLocal()
     try:
         upload_progress[filename] = {"status": "processing", "progress": 10}
         chunks = process_pdf(content, filename)
         upload_progress[filename] = {"status": "processing", "progress": 50}
         store_chunks(chunks, filename)
-        upload_progress[filename] = {"status": "done", "progress": 100, "chunks": len(chunks)}
+
+        pdf_file = db.query(PdfFile).filter(PdfFile.id==pdf_file_id).first()
+        if pdf_file:
+            pdf_file.chunk_count = len(chunks)
+            db.commit()
+
+        upload_progress[filename] = {
+            "status": "done", 
+            "progress": 100, 
+            "chunks": len(chunks),
+            "pdf_file_id": pdf_file_id
+            }
         print(f"PDF processing complete: {filename}, {len(chunks)} chunks")
 
     except Exception as e:
         print(f"Error occurred while processing PDF: {e}")
         upload_progress[filename] = {"status": "error", "progress": 0,"message": str(e)}
         print(f"PDF processing error: {e}")
+
+    finally:
+        db.close()
 
 @app.get("/upload/status/{filename}")
 async def get_upload_status(filename: str):
@@ -144,11 +189,11 @@ async def ask_question(request: QuestionRequest):
         history_text=f"History: {summary}\n"
         print(f"History Summary: {summary}")
     else:
-        for msg in request.history[-6:]:  # 只保留最近6条
+        for msg in request.history[-6:]:  # save only 6 recent messages
             role_label="Student" if msg.role=="user" else "Assistant"
             history_text += f"{role_label}: {msg.content}\n"   
 
-    # 从ChromaDB检索最相关的5个块
+    # search for 5 relevant chunks and calculate relevance score
     results_with_score = search_chunks_with_score(request.question, request.filename, k=5)
     if not results_with_score:
         raise HTTPException(status_code=404, detail=
@@ -174,8 +219,8 @@ async def ask_question(request: QuestionRequest):
         pages_used=set()  
     
         for chunk,score in results_with_score: 
-            context_parts.append(chunk.page_content) # page_content是LangChain文档对象的属性 
-            page_num=chunk.metadata.get("page",0)+1  # 页码从0开始，所以+1 
+            context_parts.append(chunk.page_content) # page_content comes from LangChain
+            page_num=chunk.metadata.get("page",0)+1  # page starts from 0，so here +1 
             pages_used.add(page_num) 
 
         context = "\n\n---\n\n".join(context_parts) 
@@ -204,6 +249,7 @@ async def ask_question(request: QuestionRequest):
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}]
         )
+        answer = answer.content[0].text.strip()
 
     else:
         print(f"RAG Relevance Score {best_score} above threshold, using web search to answer")
@@ -386,7 +432,7 @@ async def generate_preview(request: PreviewRequest):
         messages=[{"role": "user", "content": mindmap_prompt}]
     )
     mindmap_raw = mindmap_message.content[0].text.strip()
-    # 清理可能的 markdown 标记
+    # clear possible markdown marks
     if mindmap_raw.startswith("```"):
         mindmap_raw = mindmap_raw.split("\n", 1)[-1]
     if mindmap_raw.endswith("```"):
@@ -485,7 +531,7 @@ async def generate_quiz(request: QuizRequest):
 
     raw_text = message.content[0].text.strip()
 
-    # 清理 markdown 代码块标记
+    # clear possible markdown marks
     if raw_text.startswith("```"):
         raw_text = raw_text.split("\n", 1)[-1]
     if raw_text.endswith("```"):
@@ -504,3 +550,9 @@ async def generate_quiz(request: QuizRequest):
             "filename": request.filename,
             "questions": questions
     }
+
+
+@app.post("/quiz/result")
+async def save_quiz_result(request: QuizResultRequest):
+    save_quiz_memory(request.filename, request.score, request.total)
+    return {"message": "Quiz result saved successfully"}

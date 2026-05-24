@@ -70,6 +70,8 @@ def search_chunks_with_score(query: str, filename: str, k: int = 5):
     """
     collection_name = filename.replace(".","_").replace(" ","_")
 
+    print(f"[DEBUG] Searching in collection: {collection_name}")
+
     db = Chroma(
         collection_name=collection_name,
         embedding_function=get_embedding_function(),
@@ -78,5 +80,10 @@ def search_chunks_with_score(query: str, filename: str, k: int = 5):
 
     # 返回 [(Document, score), (Document, score), ...]
     results = db.similarity_search_with_score(query, k=k)
+
+    print(f"[DEBUG] Found {len(results)} chunks")  # 加这行
+    if results:
+        print(f"[DEBUG] First chunk preview: {results[0][0].page_content[:100]}")
+    
     return results
 

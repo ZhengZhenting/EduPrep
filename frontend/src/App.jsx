@@ -206,13 +206,30 @@ function App() {
     }
   }
 
-  const handleNextQuestion = () => {
+  const handleNextQuestion = async () => {
     if (currentIndex + 1 >= quizQuestions.length) {
       setQuizFinished(true)
+
+      // save to database
+      try {
+        await fetch(`${API}/quiz/result`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: filename,
+            score: score,
+            total: quizQuestions.length
+          })
+        })
+      } catch (err) {
+        console.error('Failed to save quiz result:', err)
+      }
+
+      // save to localStorage
       const progressKey = `quiz_progress_${filename}`
       const progressData = {
         filename: filename,
-        score: score + (selectedOption === quizQuestions[currentIndex].answer ? 1 : 0),
+        score: score,
         total: quizQuestions.length,
         date: new Date().toLocaleDateString()
       }

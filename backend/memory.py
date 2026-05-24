@@ -2,16 +2,30 @@ import json
 import os
 from datetime import datetime
 import anthropic
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
-
-MEMORY_DIR = "./memory_store"
-os.makedirs(MEMORY_DIR, exist_ok=True) 
+from database import SessionLocal
+from models import Memory, QuizProgress, PdfFile
 
 load_dotenv() 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
+# ----------- Helper Functions -----------
+# get pdf id
+def _get_pdf_file_id(filename: str) -> int:
+    db = SessionLocal()
+    try:
+        pdf_file = db.query(PdfFile).filter(
+            PdfFile.filename == filename,
+            PdfFile.course_id == 1
+        ).first()
+        if not pdf_file:
+            raise ValueError(f"PDF file not found in database: {filename}")
+        return pdf_file.id
+    finally:
+        db.close()
 
 # ----------- Learning Memory -----------
 # Data Structure
@@ -21,33 +35,52 @@ def _default_memory() -> dict:
         "weak_concepts": [],       
         "learning_style": "",      
         "history_summary": "",
-        "last_compressed_at": 0,
-        "last_updated": ""
+        "last_compressed_at": 0
     }
 
 # load / save memory
 def load_memory(filename: str) -> dict:
     """读取某个PDF对应的用户记忆，文件不存在则返回默认结构"""
-    path = _memory_path(filename)
-    if not os.path.exists(path):
-        return _default_memory()
+    db = SessionLocal()
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return _default_memory()
+        pdf_file_id = _get_pdf_file_id(filename)
+        memory = db.query(Memory).filter(Memory.pdf_file_id == pdf_file_id).first()
+        if not memory: 
+            return _default_memory()
+        return{
+            "weak_concepts": memory.weak_concepts or [],
+            "learning_style": memory.learning_style or "",
+            "history_summary": memory.history_summary or "",
+            "last_compressed_at": memory.last_compressed_at or 0
+        }
+    finally:
+        db.close()
 
-def save_memory(filename: str, memory: dict):
+def save_memory(filename: str, memory_data: dict):
     """保存记忆到 JSON 文件"""
-    memory["last_updated"] = datetime.now().isoformat()
-    path = _memory_path(filename)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(memory, f, ensure_ascii=False, indent=2)
+    db = SessionLocal()
+    try:
+        pdf_file_id = _get_pdf_file_id(filename)
+        memory_record = db.query(Memory).filter(Memory.pdf_file_id == pdf_file_id).first()
 
-def _memory_path(filename: str) -> str:
-    """把文件名转成合法的存储路径"""
-    safe_name = filename.replace(".", "_").replace(" ", "_")
-    return os.path.join(MEMORY_DIR, f"{safe_name}_memory.json")
+        if not memory_record:
+            memory_record = Memory(
+                pdf_file_id=pdf_file_id,
+                weak_concepts=memory_data.get("weak_concepts", []),
+                learning_style=memory_data.get("learning_style", ""),
+                history_summary=memory_data.get("history_summary", ""),
+                last_compressed_at=memory_data.get("last_compressed_at", 0)
+            )
+            db.add(memory_record)
+        else:
+            memory_record.weak_concepts = memory_data.get("weak_concepts", memory_record.weak_concepts)
+            memory_record.learning_style = memory_data.get("learning_style", memory_record.learning_style)
+            memory_record.history_summary = memory_data.get("history_summary", memory_record.history_summary)
+            memory_record.last_compressed_at = memory_data.get("last_compressed_at", memory_record.last_compressed_at)
+        db.commit()
+    finally:
+        db.close()
+
 
 # Compress History
 def should_compress(history: list, memory: dict) -> bool:
@@ -126,42 +159,53 @@ def update_memory(filename: str, question: str, answer: str, memory: dict) -> di
     return memory
 
 # ----------- Quiz Memory -----------
-def _quiz_memory_path(filename: str) -> str:
-    safe_name = filename.replace(".", "_").replace(" ", "_")
-    return os.path.join(MEMORY_DIR, f"{safe_name}_quiz_memory.json")
-
-
 def load_quiz_memory(filename: str) -> dict:
-    path = _quiz_memory_path(filename)
-    if not os.path.exists(path):
-        return {"quiz_history": [], "average_score": 0.0}
+    db = SessionLocal()
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return {"quiz_history": [], "average_score": 0.0}
+        pdf_file_id = _get_pdf_file_id(filename)
+        records = db.query(QuizProgress).filter(
+            QuizProgress.pdf_file_id == pdf_file_id
+        ).order_by(QuizProgress.created_at.desc()).limit(5).all()
+        
+        if not records:
+            return {
+                "quiz_history": [],
+                "average_score": 0.0
+            }
+        
+        quiz_history = [
+            {
+                "score": r.score,
+                "total": r.total,  
+                "percentage": r.percentage,
+                "date": r.created_at.isoformat()
+            }
+            for r in records
+        ]
+
+        average_score = round(sum(r.percentage for r in records) / len(records), 2)
+        return {
+            "quiz_history": quiz_history,
+            "average_score": average_score
+        }
+    finally:        
+        db.close()
 
 
-def save_quiz_memory(filename: str, score: int, total: int):
+def save_quiz_memory(filename: str, score: int, total: int, wrong_questions: list = None):
     """每次 Quiz 完成后调用，保存得分"""
-    memory = load_quiz_memory(filename)
-
-    memory["quiz_history"].append({
-        "score": score,
-        "total": total,
-        "percentage": round(score / total, 2),
-        "date": datetime.now().isoformat()
-    })
-
-    # save recent 5 records
-    memory["quiz_history"] = memory["quiz_history"][-5:]
-
-    # update average score
-    if memory["quiz_history"]:
-        memory["average_score"] = round(
-            sum(r["percentage"] for r in memory["quiz_history"]) / len(memory["quiz_history"]), 2
+    db = SessionLocal()
+    try:
+        pdf_file_id = _get_pdf_file_id(filename)
+        percentage = round(score / total, 2)
+        record = QuizProgress(
+            pdf_file_id=pdf_file_id,
+            score=score,
+            total=total,
+            percentage=percentage,
+            wrong_questions=wrong_questions or []
         )
-
-    path = _quiz_memory_path(filename)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(memory, f, ensure_ascii=False, indent=2)
+        db.add(record)
+        db.commit()
+    finally:
+        db.close()
