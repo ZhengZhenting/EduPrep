@@ -62,13 +62,17 @@ function App() {
         const res = await fetch(`${API}/upload/status/${encodeURIComponent(filename)}`)
         const data = await res.json()
 
-        if (data.status === "done") {
+        if (data.status === 'done') {
           clearInterval(interval)
           setUploadStatus(`✅ ${filename} ready — ${data.chunks} chunks`)
           setUploading(false)
-        } else if (data.status === "error") {
+
+          // 加载该 PDF 的历史对话
+          await loadMessages(filename)
+
+        } else if (data.status === 'error') {
           clearInterval(interval)
-          setUploadStatus(`❌ Processing failed: ${data.message}`)
+          setUploadStatus(`Processing failed: ${data.message}`)
           setUploading(false)
         } else {
           setUploadStatus(`Processing PDF... ${data.progress}%`)
@@ -78,7 +82,23 @@ function App() {
         setUploadStatus(`Error checking status: ${err.message}`)
         setUploading(false)
       }
-    }, 2000) // ask every 2 seconds
+    }, 2000)
+  }
+
+  // 加载历史消息 messages接口
+  const loadMessages = async (filename) => {
+    try {
+      const res = await fetch(`${API}/messages/${encodeURIComponent(filename)}`)
+      if (!res.ok) return
+
+      const data = await res.json()
+      if (data.messages && data.messages.length > 0) {
+        setHistory(data.messages)
+        console.log(`Loaded ${data.messages.length} historical messages`)
+      }
+    } catch (err) {
+      console.error('Failed to load messages:', err)
+    }
   }
 
   // 处理提问Ask
@@ -334,7 +354,7 @@ function App() {
               }
               {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
                 <div style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>
-                  📄 Sources from Page： {msg.sources.join('、')}
+                  Sources from Page： {msg.sources.join('、')}
                 </div>
               )}
             </div>
@@ -351,7 +371,7 @@ function App() {
           </h2>
           {sources.length > 0 && (
             <p style={styles.sources}>
-              📄 Sources from Page： {sources.join('、')}
+              Sources from Page： {sources.join('、')}
             </p>
           )}
           <AnswerRenderer text={answer} />
@@ -455,8 +475,8 @@ function App() {
               <div style={styles.explanation}>
                 <strong>
                   {selectedOption === quizQuestions[currentIndex].answer
-                    ? '✅ Answer is correct!'
-                    : `❌ Answer is wrong, the correct answer is ${quizQuestions[currentIndex].answer}`
+                    ? 'Answer is correct!'
+                    : `Answer is wrong, the correct answer is ${quizQuestions[currentIndex].answer}`
                   }
                 </strong>
                 <p style={{ margin: '8px 0 0 0', fontSize: 14 }}>
@@ -506,8 +526,8 @@ function App() {
               {score / quizQuestions.length >= 0.8
                 ? '🌟 Great job!'
                 : score / quizQuestions.length >= 0.6
-                  ? '📖 Keep studying to improve'
-                  : '💪 Consider reviewing this material'
+                  ? 'Keep studying to improve'
+                  : 'Consider reviewing this material'
               }
             </p>
 

@@ -1,5 +1,5 @@
 import json
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from dotenv import load_dotenv
@@ -11,14 +11,14 @@ from typing import List
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy.orm import Session
-from fastapi import Depends
+from wasabi import msg
 
 
 from pdf_processor import process_pdf
 from rag import store_chunks, search_chunks, search_chunks_with_score
 from memory import load_memory, save_memory, compress_history, update_memory, should_compress, load_quiz_memory, save_quiz_memory
 from database import get_db, SessionLocal
-from models import PdfFile
+from models import User, Course, PdfFile, Message, Note, Memory, QuizProgress
 
 # ---------- Requests --------------
 # Preview
@@ -68,7 +68,7 @@ class QuizResultRequest(BaseModel):
     total: int
 
 # ----------  History message --------------
-class Message(BaseModel):
+class ChatMessage(BaseModel):
     role: str 
     content: str
     sources: Optional[List] = []
@@ -77,7 +77,7 @@ class Message(BaseModel):
 class QuestionRequest(BaseModel):
     filename: str
     question: str
-    history: Optional[List[Message]] = []
+    history: Optional[List[ChatMessage]] = []
 
 # create FastAPI application, test: http://localhost:8000/docs, uvicorn running on: http://127.0.0.1:8000
 app = FastAPI()
@@ -177,7 +177,15 @@ async def get_upload_status(filename: str):
 
 
 @app.post("/ask") 
-async def ask_question(request: QuestionRequest):
+async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
+    pdf_file = db.query(PdfFile).filter(
+        PdfFile.filename==request.filename,
+        PdfFile.course_id==1
+    ).first()
+
+    if not pdf_file:
+        raise HTTPException(status_code=404, detail="PDF file not found in database.")
+    
     memory = load_memory(request.filename)
 
     # 对话历史
@@ -332,7 +340,27 @@ async def ask_question(request: QuestionRequest):
 
     memory = update_memory(request.filename, request.question, answer, memory)
     save_memory(request.filename, memory)
-        
+    
+    user_message = Message(
+        pdf_file_id=pdf_file.id,
+        role="user",
+        content=request.question,
+        source_type=None,
+        sources=None
+    )
+
+    assistant_message = Message(
+        pdf_file_id=pdf_file.id,
+        role="assistant",
+        content=answer,
+        source_type=source_type,
+        sources=sources
+    )
+
+    db.add(user_message)
+    db.add(assistant_message)
+    db.commit()
+
     return {
         "question": request.question,
         "answer": answer,
@@ -341,6 +369,31 @@ async def ask_question(request: QuestionRequest):
         "relevance": best_score<SCORE_THRESHOLD
     }
 
+@app.get("/message/{filename}")
+async def get_messages(filename: str, db: Session = Depends(get_db)):
+    pdf_file = db.query(PdfFile).filter(
+        PdfFile.filename==filename,
+        PdfFile.course_id==1
+    ).first()
+
+    if not pdf_file:
+        raise HTTPException(status_code=404, detail="PDF file not found in database.")
+    
+    messages = db.query(Message).filter(
+        Message.pdf_file_id==pdf_file.id
+        ).order_by(Message.created_at.asc()).all()
+    
+    return {
+        "filename": filename,
+        "messages": [
+            {
+                "role": msg.role,
+                "content": msg.content,
+                "source_type": msg.source_type,
+                "sources": msg.sources or []
+            } for msg in messages
+        ]
+    }
 
 @app.post("/preview")
 async def generate_preview(request: PreviewRequest):
