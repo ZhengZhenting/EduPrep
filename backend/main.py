@@ -35,6 +35,22 @@ class QuizResultRequest(BaseModel):
     score: int
     total: int
 
+class ChatMessage(BaseModel):
+    role: str 
+    content: str
+    sources: Optional[List] = []
+    source_type: Optional[str] = "pdf"
+
+class QuestionRequest(BaseModel):
+    filename: str
+    question: str
+    history: Optional[List[ChatMessage]] = []
+
+class NoteCreateRequest(BaseModel):
+    filename: str
+    type: str # answer / summary / quiz_explanation
+    content: str
+
 # ---------- Structured Output Models --------------
 # Preview
 class VocabItem(BaseModel):
@@ -67,18 +83,6 @@ class QuizResultRequest(BaseModel):
     score: int
     total: int
 
-# ----------  History message --------------
-class ChatMessage(BaseModel):
-    role: str 
-    content: str
-    sources: Optional[List] = []
-    source_type: Optional[str] = "pdf"
-
-class QuestionRequest(BaseModel):
-    filename: str
-    question: str
-    history: Optional[List[ChatMessage]] = []
-
 # create FastAPI application, test: http://localhost:8000/docs, uvicorn running on: http://127.0.0.1:8000
 app = FastAPI()
 
@@ -98,7 +102,6 @@ app.add_middleware(
 upload_progress = {}
 executor = ThreadPoolExecutor()
 
-# upload PDF：processing PDF → chunks → save in Database and ChromaDB
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)):
     
@@ -140,6 +143,7 @@ async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)
         "status": "processing"
     }
 
+
 def process_pdf_background(content:bytes, filename:str, pdf_file_id: int):
     db = SessionLocal()
     try:
@@ -168,6 +172,7 @@ def process_pdf_background(content:bytes, filename:str, pdf_file_id: int):
 
     finally:
         db.close()
+
 
 @app.get("/upload/status/{filename}")
 async def get_upload_status(filename: str):
@@ -369,6 +374,7 @@ async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
         "relevance": best_score<SCORE_THRESHOLD
     }
 
+
 @app.get("/message/{filename}")
 async def get_messages(filename: str, db: Session = Depends(get_db)):
     pdf_file = db.query(PdfFile).filter(
@@ -394,6 +400,7 @@ async def get_messages(filename: str, db: Session = Depends(get_db)):
             } for msg in messages
         ]
     }
+
 
 @app.post("/preview")
 async def generate_preview(request: PreviewRequest):
@@ -609,3 +616,71 @@ async def generate_quiz(request: QuizRequest):
 async def save_quiz_result(request: QuizResultRequest):
     save_quiz_memory(request.filename, request.score, request.total)
     return {"message": "Quiz result saved successfully"}
+
+
+@app.post("/notes")
+async def create_note(request: NoteCreateRequest, db: Session = Depends(get_db)):
+    pdf_file = db.query(PdfFile).filter(
+        PdfFile.filename==request.filename,
+        PdfFile.course_id==1
+    ).first()
+
+    if not pdf_file:
+        raise HTTPException(status_code=404, detail="PDF file not found in database.")
+    
+    note = Note(
+        pdf_file_id=pdf_file.id,
+        type=request.type,
+        content=request.content
+    )
+
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+
+    return {
+        "id": note.id,
+        "type": note.type,
+        "content": note.content,
+        "created_at": note.created_at.isoformat()
+    }
+
+
+@app.get("/notes/{filename}")
+async def get_notes(filename: str, db: Session = Depends(get_db)):
+    pdf_file = db.query(PdfFile).filter(
+        PdfFile.filename==filename,
+        PdfFile.course_id==1
+    ).first()
+
+    if not pdf_file:
+        raise HTTPException(status_code=404, detail="PDF file not found in database.")
+    
+    notes = db.query(Note).filter(
+        Note.pdf_file_id==pdf_file.id
+        ).order_by(Note.created_at.asc()).all()
+    
+    return {
+        "filename": filename,
+        "notes": [
+            {
+                "id": note.id,
+                "type": note.type,
+                "content": note.content,
+                "created_at": note.created_at.isoformat()
+            } for note in notes
+        ]
+    }
+
+
+@app.delete("/notes/{note_id}")
+async def delete_note(note_id: int, db: Session = Depends(get_db)):
+    note = db.query(Note).filter(Note.id==note_id).first()
+
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found.")
+    
+    db.delete(note)
+    db.commit()
+
+    return {"message": "Note deleted successfully"}

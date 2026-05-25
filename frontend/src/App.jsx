@@ -25,6 +25,9 @@ function App() {
   const [score, setScore] = useState(0)                       // 答对的题数
   const [quizFinished, setQuizFinished] = useState(false)     // 是否做完所有题
   const [loadingQuiz, setLoadingQuiz] = useState(false)       // 是否正在加载题目
+  // note相关状态
+  const [notes, setNotes] = useState([])
+  const [showNotes, setShowNotes] = useState(false)
 
 
   // 处理PDF上传Upload
@@ -69,6 +72,7 @@ function App() {
 
           // 加载该 PDF 的历史对话
           await loadMessages(filename)
+          await loadNotes(filename)
 
         } else if (data.status === 'error') {
           clearInterval(interval)
@@ -83,6 +87,46 @@ function App() {
         setUploading(false)
       }
     }, 2000)
+  }
+
+  // Note operations: load, save and delete
+  const loadNotes = async (filename) => {
+    try {
+      const res = await fetch(`${API}/notes/${encodeURIComponent(filename)}`)
+      if (!res.ok) return
+      const data = await res.json()
+      setNotes(data.notes || [])
+    } catch (err) {
+      console.error('Failed to load notes:', err)
+    }
+  }
+
+  const saveNote = async (type, content) => {
+    try {
+      const res = await fetch(`${API}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: filename,
+          type: type,
+          content: content
+        })
+      })
+      if (!res.ok) throw new Error('Save failed')
+      const newNote = await res.json()
+      setNotes(prev => [newNote, ...prev])
+    } catch (err) {
+      alert(`Save note failed: ${err.message}`)
+    }
+  }
+
+  const deleteNote = async (noteId) => {
+    try {
+      await fetch(`${API}/notes/${noteId}`, { method: 'DELETE' })
+      setNotes(prev => prev.filter(n => n.id !== noteId))
+    } catch (err) {
+      console.error('Failed to delete note:', err)
+    }
   }
 
   // 加载历史消息 messages接口
@@ -278,6 +322,43 @@ function App() {
     <div style={styles.container}>
       <h1 style={styles.title}>EduPrep</h1>
 
+      <button
+        onClick={() => setShowNotes(prev => !prev)}
+        style={styles.btn}
+        disabled={!filename}
+      >
+        {showNotes ? 'Hide Notes' : `Notes (${notes.length})`}
+      </button>
+
+      {showNotes && (
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Notes</h2>
+          {notes.length === 0 ? (
+            <p style={{ color: '#9ca3af', fontSize: 13 }}>No notes saved yet.</p>
+          ) : (
+            notes.map(note => (
+              <div key={note.id} style={styles.noteItem}>
+                <div style={styles.noteHeader}>
+                  <span style={styles.noteType}>{note.type}</span>
+                  <span style={styles.noteDate}>
+                    {new Date(note.created_at).toLocaleDateString()}
+                  </span>
+                  <button
+                    onClick={() => deleteNote(note.id)}
+                    style={styles.deleteNoteBtn}
+                  >
+                    🗑️
+                  </button>
+                </div>
+                <div style={styles.noteContent}>
+                  <AnswerRenderer text={note.content} />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {/* 上传区域 */}
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>Upload PDF</h2>
@@ -356,6 +437,15 @@ function App() {
                 <div style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>
                   Sources from Page： {msg.sources.join('、')}
                 </div>
+              )}
+              {/* 保存笔记按钮 */}
+              {msg.role === 'assistant' && (
+                <button
+                  onClick={() => saveNote('answer', msg.content)}
+                  style={styles.saveNoteBtn}
+                >
+                  Save as Note
+                </button>
               )}
             </div>
           ))}
@@ -771,6 +861,50 @@ const styles = {
     fontSize: 28,
     color: '#888',
   },
+  saveNoteBtn: {
+    marginTop: 8,
+    padding: '4px 10px',
+    fontSize: 12,
+    background: '#f3f4f6',
+    border: '1px solid #d1d5db',
+    borderRadius: 4,
+    cursor: 'pointer',
+    color: '#374151'
+  },
+  noteItem: {
+    padding: '12px',
+    borderBottom: '1px solid #e5e7eb',
+    marginBottom: 8
+  },
+  noteHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+    fontSize: 12,
+    color: '#6b7280'
+  },
+  noteType: {
+    background: '#dbeafe',
+    color: '#1e40af',
+    padding: '2px 8px',
+    borderRadius: 4,
+    fontWeight: 500
+  },
+  noteDate: {
+    color: '#9ca3af'
+  },
+  deleteNoteBtn: {
+    marginLeft: 'auto',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: 14
+  },
+  noteContent: {
+    fontSize: 14,
+    color: '#1f2937'
+  }
 }
 
 export default App
