@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import AnswerRenderer from './AnswerRenderer'
 
 const API = 'http://localhost:8000'  // 对接后端API地址
@@ -29,17 +29,77 @@ function App() {
   const [notes, setNotes] = useState([])
   const [showNotes, setShowNotes] = useState(false)
 
+  // course相关状态
+  const [courses, setCourses] = useState([])
+  const [selectedCourseId, setSelectedCourseId] = useState(1)
+  const [coursesLoading, setCoursesLoading] = useState(false)
+
+   useEffect(() => {
+    loadCourses()
+  }, [])
+
+  // load, create, delete course
+  const loadCourses = async () => {
+    setCoursesLoading(true)
+    try {
+      const res = await fetch(`${API}/courses`)
+      const data = await res.json()
+      setCourses(data.courses || [])
+    } catch (err) {
+      console.error('Failed to load courses:', err)
+    }
+    setCoursesLoading(false)
+  }
+
+  const createCourse = async () => {
+    const title = prompt('Course name:')
+    if (!title || !title.trim()) return
+
+    try {
+      const res = await fetch(`${API}/courses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: title.trim() })
+      })
+      if (!res.ok) throw new Error('Create failed')
+      await loadCourses()
+    } catch (err) {
+      alert(`Create course failed: ${err.message}`)
+    }
+  }
+
+  const deleteCourse = async (courseId) => {
+    if (courseId === 1) {
+      alert('Default course cannot be deleted')
+      return
+    }
+    if (!confirm('Delete this course and all its PDFs?')) return
+
+    try {
+      const res = await fetch(`${API}/courses/${courseId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Delete failed')
+      await loadCourses()
+
+      // 如果删的是当前选中的课程，切回默认课程
+      if (selectedCourseId === courseId) {
+        setSelectedCourseId(1)
+      }
+    } catch (err) {
+      alert(`Delete course failed: ${err.message}`)
+    }
+  }
 
   // 处理PDF上传Upload
-  const handleUpload = async (e) => { //e 是事件对象，里面包含用户选的文件,async 表示这个函数要等待网络请求，不会卡住页面。
-    const file = e.target.files[0] // 获取用户选的第一个文件files[0]
-    if (!file) return //如果用户没有选文件就关掉了弹窗，直接退出，什么都不做。
+  const handleUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
 
     setUploading(true)
-    setUploadStatus('uploading...')
+    setUploadStatus('Uploading...')
 
     const formData = new FormData()
-    formData.append('file', file) //这个名字必须和后端完全一致 — 后端写的是 file: UploadFile = File(...)，所以前端这里也必须叫 'file'
+    formData.append('file', file)
+    formData.append('course_id', selectedCourseId)   // ← 新增这行
 
     try {
       const res = await fetch(`${API}/upload`, {
@@ -47,16 +107,15 @@ function App() {
         body: formData
       })
       const data = await res.json()
-      setFilename(data.filename)  //这里取出 filename 存起来，因为下面提问时需要告诉后端是哪个文件
-      setUploadStatus(`File ${data.filename} start uploading`) //后端返回的JSON里面的字段见后端的 upload() 函数 return {'filename': filename, 'chunks': num_chunks......}
-      setHistory([]) //上传新文件后清空对话历史
-      pollUploadStatus(data.filename) //开始轮询上传状态，直到后端处理完这个文件
+      setFilename(data.filename)
+      setUploadStatus('Processing PDF...')
+      setHistory([])
+      pollUploadStatus(data.filename)
+
     } catch (err) {
       setUploadStatus(`Upload failed: ${err.message}`)
       setUploading(false)
     }
-
-    setUploading(false)
   }
 
   const pollUploadStatus = (filename) => {
@@ -92,7 +151,7 @@ function App() {
   // Note operations: load, save and delete
   const loadNotes = async (filename) => {
     try {
-      const res = await fetch(`${API}/notes/${encodeURIComponent(filename)}`)
+      const res = await fetch(`${API}/notes/${encodeURIComponent(filename)}?course_id=${selectedCourseId}`)
       if (!res.ok) return
       const data = await res.json()
       setNotes(data.notes || [])
@@ -109,7 +168,8 @@ function App() {
         body: JSON.stringify({
           filename: filename,
           type: type,
-          content: content
+          content: content,
+          course_id: selectedCourseId
         })
       })
       if (!res.ok) throw new Error('Save failed')
@@ -132,7 +192,7 @@ function App() {
   // 加载历史消息 messages接口
   const loadMessages = async (filename) => {
     try {
-      const res = await fetch(`${API}/messages/${encodeURIComponent(filename)}`)
+     const res = await fetch(`${API}/messages/${encodeURIComponent(filename)}?course_id=${selectedCourseId}`)
       if (!res.ok) return
 
       const data = await res.json()
@@ -164,7 +224,8 @@ function App() {
         body: JSON.stringify({
           history: history,
           question: currentQuestion,
-          filename: filename
+          filename: filename,
+          course_id: selectedCourseId
         })
       })
 
@@ -197,7 +258,7 @@ function App() {
       const response = await fetch(`${API}/preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: filename })
+        body: JSON.stringify({ filename: filename, course_id: selectedCourseId })
       })
       if (!response.ok) {
         const err = await response.json()
@@ -242,7 +303,7 @@ function App() {
       const response = await fetch(`${API}/quiz`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: filename, num_questions: 5 })
+        body: JSON.stringify({ filename: filename, course_id: selectedCourseId, num_questions: 5 })
       })
       if (!response.ok) {
         const err = await response.json()
@@ -281,6 +342,7 @@ function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             filename: filename,
+            course_id: selectedCourseId,
             score: score,
             total: quizQuestions.length
           })
@@ -321,6 +383,28 @@ function App() {
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>EduPrep</h1>
+
+      {/* 课程选择栏 */}
+      <div style={styles.courseBar}>
+        <span style={{ fontSize: 14, color: '#374151', marginRight: 8 }}>Course:</span>
+        <select
+          value={selectedCourseId}
+          onChange={(e) => setSelectedCourseId(Number(e.target.value))}
+          style={styles.courseSelect}
+        >
+          {courses.map(c => (
+            <option key={c.id} value={c.id}>
+              {c.title} ({c.pdf_count} PDFs)
+            </option>
+          ))}
+        </select>
+        <button onClick={createCourse} style={styles.btnSmall}>+ New</button>
+        {selectedCourseId !== 1 && (
+          <button onClick={() => deleteCourse(selectedCourseId)} style={styles.btnSmallDanger}>
+            Delete
+          </button>
+        )}
+      </div>
 
       <button
         onClick={() => setShowNotes(prev => !prev)}
@@ -904,6 +988,42 @@ const styles = {
   noteContent: {
     fontSize: 14,
     color: '#1f2937'
+  },
+  courseBar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '12px 16px',
+    background: '#f9fafb',
+    borderBottom: '1px solid #e5e7eb',
+    marginBottom: 16
+  },
+  courseSelect: {
+    padding: '6px 10px',
+    fontSize: 14,
+    borderRadius: 6,
+    border: '1px solid #d1d5db',
+    background: '#fff',
+    minWidth: 200,
+    cursor: 'pointer'
+  },
+  btnSmall: {
+    padding: '4px 10px',
+    fontSize: 12,
+    background: '#2563eb',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 4,
+    cursor: 'pointer'
+  },
+  btnSmallDanger: {
+    padding: '4px 10px',
+    fontSize: 12,
+    background: '#dc2626',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 4,
+    cursor: 'pointer'
   }
 }
 

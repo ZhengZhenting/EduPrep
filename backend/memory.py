@@ -14,12 +14,12 @@ claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 # ----------- Helper Functions -----------
 # get pdf id
-def _get_pdf_file_id(filename: str) -> int:
+def _get_pdf_file_id(filename: str, course_id: int=1) -> int:
     db = SessionLocal()
     try:
         pdf_file = db.query(PdfFile).filter(
             PdfFile.filename == filename,
-            PdfFile.course_id == 1
+            PdfFile.course_id == course_id
         ).first()
         if not pdf_file:
             raise ValueError(f"PDF file not found in database: {filename}")
@@ -39,11 +39,11 @@ def _default_memory() -> dict:
     }
 
 # load / save memory
-def load_memory(filename: str) -> dict:
+def load_memory(filename: str, course_id: int=1) -> dict:
     """读取某个PDF对应的用户记忆，文件不存在则返回默认结构"""
     db = SessionLocal()
     try:
-        pdf_file_id = _get_pdf_file_id(filename)
+        pdf_file_id = _get_pdf_file_id(filename, course_id)
         memory = db.query(Memory).filter(Memory.pdf_file_id == pdf_file_id).first()
         if not memory: 
             return _default_memory()
@@ -56,11 +56,11 @@ def load_memory(filename: str) -> dict:
     finally:
         db.close()
 
-def save_memory(filename: str, memory_data: dict):
+def save_memory(filename: str, memory_data: dict, course_id: int=1):
     """保存记忆到 JSON 文件"""
     db = SessionLocal()
     try:
-        pdf_file_id = _get_pdf_file_id(filename)
+        pdf_file_id = _get_pdf_file_id(filename, course_id)
         memory_record = db.query(Memory).filter(Memory.pdf_file_id == pdf_file_id).first()
 
         if not memory_record:
@@ -159,10 +159,10 @@ def update_memory(filename: str, question: str, answer: str, memory: dict) -> di
     return memory
 
 # ----------- Quiz Memory -----------
-def load_quiz_memory(filename: str) -> dict:
+def load_quiz_memory(filename: str, course_id: int=1) -> dict:
     db = SessionLocal()
     try:
-        pdf_file_id = _get_pdf_file_id(filename)
+        pdf_file_id = _get_pdf_file_id(filename, course_id)
         records = db.query(QuizProgress).filter(
             QuizProgress.pdf_file_id == pdf_file_id
         ).order_by(QuizProgress.created_at.desc()).limit(5).all()
@@ -192,11 +192,11 @@ def load_quiz_memory(filename: str) -> dict:
         db.close()
 
 
-def save_quiz_memory(filename: str, score: int, total: int, wrong_questions: list = None):
+def save_quiz_memory(filename: str, score: int, total: int, wrong_questions: list = None, course_id: int=1):
     """每次 Quiz 完成后调用，保存得分"""
     db = SessionLocal()
     try:
-        pdf_file_id = _get_pdf_file_id(filename)
+        pdf_file_id = _get_pdf_file_id(filename, course_id)
         percentage = round(score / total, 2)
         record = QuizProgress(
             pdf_file_id=pdf_file_id,

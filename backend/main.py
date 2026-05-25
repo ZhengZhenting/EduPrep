@@ -1,5 +1,5 @@
 import json
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from dotenv import load_dotenv
@@ -24,17 +24,21 @@ from models import User, Course, PdfFile, Message, Note, Memory, QuizProgress
 # Preview
 class PreviewRequest(BaseModel):
     filename: str
+    course_id: int = Form(1)
 
 # Quiz
 class QuizRequest(BaseModel):
     filename: str
+    course_id: int = Form(1)
     num_questions: int = 5
 
 class QuizResultRequest(BaseModel):
     filename: str
+    course_id: int = Form(1)
     score: int
     total: int
 
+# Ask
 class ChatMessage(BaseModel):
     role: str 
     content: str
@@ -43,13 +47,23 @@ class ChatMessage(BaseModel):
 
 class QuestionRequest(BaseModel):
     filename: str
+    course_id: int = Form(1)
     question: str
     history: Optional[List[ChatMessage]] = []
 
+# Notes
 class NoteCreateRequest(BaseModel):
     filename: str
+    course_id: int = Form(1)
     type: str # answer / summary / quiz_explanation
     content: str
+
+# Course
+class CourseCreateRequest(BaseModel):
+    title: str
+
+class CourseUpdateRequest(BaseModel):
+    title: str
 
 # ---------- Structured Output Models --------------
 # Preview
@@ -80,6 +94,7 @@ class QuizResponse(BaseModel):
 
 class QuizResultRequest(BaseModel):
     filename: str
+    course_id: int = Form(1)
     score: int
     total: int
 
@@ -103,14 +118,18 @@ upload_progress = {}
 executor = ThreadPoolExecutor()
 
 @app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_pdf(file: UploadFile = File(...), course_id: int = Form(1), db: Session = Depends(get_db)):
     
     content = await file.read()  
     filename=file.filename
 
+    course = db.query(Course).filter(Course.id==course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found in database.")
+    
     existing = db.query(PdfFile).filter(
         PdfFile.filename==filename,
-        PdfFile.course_id==1
+        PdfFile.course_id==course_id
     ).first() # limit 1
 
     if existing:
@@ -118,7 +137,7 @@ async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)
         print(f"PdfFile already exists in database: {filename}")
     else:
         pdf_file = PdfFile(
-            course_id=1,
+            course_id=course_id,
             filename=filename, 
             chunk_count=0
         )
@@ -185,13 +204,13 @@ async def get_upload_status(filename: str):
 async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
     pdf_file = db.query(PdfFile).filter(
         PdfFile.filename==request.filename,
-        PdfFile.course_id==1
-    ).first()
+        PdfFile.course_id==request.course_id
+    ).first() 
 
     if not pdf_file:
         raise HTTPException(status_code=404, detail="PDF file not found in database.")
     
-    memory = load_memory(request.filename)
+    memory = load_memory(request.filename, request.course_id)
 
     # 对话历史
     history_text=""
@@ -344,7 +363,7 @@ async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
             sources = []
 
     memory = update_memory(request.filename, request.question, answer, memory)
-    save_memory(request.filename, memory)
+    save_memory(request.filename, memory, request.course_id)
     
     user_message = Message(
         pdf_file_id=pdf_file.id,
@@ -376,10 +395,10 @@ async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
 
 
 @app.get("/message/{filename}")
-async def get_messages(filename: str, db: Session = Depends(get_db)):
+async def get_messages(filename: str, course_id: int = Form(1), db: Session = Depends(get_db)):
     pdf_file = db.query(PdfFile).filter(
         PdfFile.filename==filename,
-        PdfFile.course_id==1
+        PdfFile.course_id==course_id
     ).first()
 
     if not pdf_file:
@@ -512,12 +531,12 @@ async def generate_preview(request: PreviewRequest):
 @app.post("/quiz")
 async def generate_quiz(request: QuizRequest):
     # get weak concepts
-    conv_memory = load_memory(request.filename)
+    conv_memory = load_memory(request.filename, request.course_id)
     weak_concepts = conv_memory.get("weak_concepts", [])
     print(f"weak_concepts: {weak_concepts}")
 
     # get quiz history scores
-    quiz_memory = load_quiz_memory(request.filename)
+    quiz_memory = load_quiz_memory(request.filename, request.course_id)
     average_score = quiz_memory.get("average_score", 0.0)
     print(f"average_score: {average_score}")
 
@@ -614,7 +633,7 @@ async def generate_quiz(request: QuizRequest):
 
 @app.post("/quiz/result")
 async def save_quiz_result(request: QuizResultRequest):
-    save_quiz_memory(request.filename, request.score, request.total)
+    save_quiz_memory(request.filename, request.score, request.total, request.course_id)
     return {"message": "Quiz result saved successfully"}
 
 
@@ -622,7 +641,7 @@ async def save_quiz_result(request: QuizResultRequest):
 async def create_note(request: NoteCreateRequest, db: Session = Depends(get_db)):
     pdf_file = db.query(PdfFile).filter(
         PdfFile.filename==request.filename,
-        PdfFile.course_id==1
+        PdfFile.course_id==request.course_id
     ).first()
 
     if not pdf_file:
@@ -647,10 +666,10 @@ async def create_note(request: NoteCreateRequest, db: Session = Depends(get_db))
 
 
 @app.get("/notes/{filename}")
-async def get_notes(filename: str, db: Session = Depends(get_db)):
+async def get_notes(filename: str, course_id: int = Form(1), db: Session = Depends(get_db)):
     pdf_file = db.query(PdfFile).filter(
         PdfFile.filename==filename,
-        PdfFile.course_id==1
+        PdfFile.course_id==course_id
     ).first()
 
     if not pdf_file:
@@ -684,3 +703,99 @@ async def delete_note(note_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Note deleted successfully"}
+
+
+@app.post("/courses")
+async def create_course(request: CourseCreateRequest, db: Session = Depends(get_db)):
+    course = Course(
+        user_id=1, 
+        title=request.title
+    )
+
+    db.add(course)
+    db.commit()
+    db.refresh(course)
+
+    return {
+        "id": course.id,
+        "title": course.title,
+        "created_at": course.created_at.isoformat(),
+        "pdf_count":0
+    }
+
+
+@app.get("/courses")
+async def get_courses(db: Session = Depends(get_db)):
+    courses = db.query(Course).filter(Course.user_id == 1).order_by(Course.created_at).all()
+
+    result=[]
+    for c in courses:
+        pdf_count = db.query(PdfFile).filter(PdfFile.course_id == c.id).count()
+        result.append({
+            "id": c.id,
+            "title": c.title,
+            "created_at": c.created_at.isoformat(),
+            "pdf_count": pdf_count
+        })
+    return {
+        "courses":result 
+    }
+
+
+@app.get("/courses/{course_id}")
+async def get_course(course_id: int, db: Session = Depends(get_db)):
+    course = db.query(Course).filter(Course.id==course_id).first()
+
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found.")
+    
+    pdf_files = db.query(PdfFile).filter(PdfFile.course_id==course.id).order_by(PdfFile.created_at.desc()).all()
+    pdf_list = []
+    for pdf in pdf_files:
+        pdf_list.append({
+            "id": pdf.id,
+            "filename": pdf.filename,
+            "chunk_count": pdf.chunk_count,
+            "created_at": pdf.created_at.isoformat()
+        })
+
+    return {
+        "id": course.id,
+        "title": course.title,
+        "created_at": course.created_at.isoformat(),
+        "pdf_files": pdf_list
+    }
+
+
+@app.patch("/courses/{course_id}")
+async def update_course(course_id: int, request: CourseUpdateRequest, db: Session = Depends(get_db)):
+    course = db.query(Course).filter(Course.id==course_id).first()
+
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found.")
+    
+    course.title = request.title
+    db.commit()
+    db.refresh(course)
+
+    return {
+        "id": course.id,
+        "title": course.title,
+        "created_at": course.created_at.isoformat()
+    }
+
+
+@app.delete("/courses/{course_id}")
+async def delete_course(course_id: int, db: Session = Depends(get_db)):
+    if course_id == 1:
+        raise HTTPException(status_code=400, detail="Default course cannot be deleted")
+
+    course = db.query(Course).filter(Course.id==course_id).first()
+
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found.")
+    
+    db.delete(course)
+    db.commit()
+
+    return {"message": "Course deleted successfully"}
