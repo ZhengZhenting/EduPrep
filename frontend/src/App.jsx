@@ -34,7 +34,7 @@ function App() {
   const [selectedCourseId, setSelectedCourseId] = useState(1)
   const [coursesLoading, setCoursesLoading] = useState(false)
 
-   useEffect(() => {
+  useEffect(() => {
     loadCourses()
   }, [])
 
@@ -192,7 +192,7 @@ function App() {
   // 加载历史消息 messages接口
   const loadMessages = async (filename) => {
     try {
-     const res = await fetch(`${API}/messages/${encodeURIComponent(filename)}?course_id=${selectedCourseId}`)
+      const res = await fetch(`${API}/messages/${encodeURIComponent(filename)}?course_id=${selectedCourseId}`)
       if (!res.ok) return
 
       const data = await res.json()
@@ -549,6 +549,22 @@ function App() {
             </p>
           )}
           <AnswerRenderer text={answer} />
+        </div>
+      )}
+
+      {msg.source_type === 'pdf' && msg.sources?.length > 0 && (
+        <div style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>
+          Sources from Page：{msg.sources.join('、')}
+        </div>
+      )}
+      {msg.source_type === 'pdf+web' && (
+        <div style={{ fontSize: 12, color: '#7c3aed', marginTop: 4 }}>
+          PDF + Web
+        </div>
+      )}
+      {msg.source_type === 'web' && (
+        <div style={{ fontSize: 12, color: '#059669', marginTop: 4 }}>
+          Web Search
         </div>
       )}
 

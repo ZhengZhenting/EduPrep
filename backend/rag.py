@@ -1,6 +1,9 @@
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
+from langchain_core.documents import Document
+from rank_bm25 import BM25Okapi
 import os
+import re
 
 CHROMA_DIR = "./chroma_db" 
 EMBEDDING_MODEL = "nomic-embed-text"
@@ -44,46 +47,107 @@ def store_chunks(chunks:list, filename: str):
     print(f"Chunks stored in ChromaDB: {len(chunks)} chunks, collection name = {collection_name}.")
     return collection_name
 
-def search_chunks(query: str, filename:str, k:int=5):
-    """
-    根据问题，从ChromaDB里找最相关的k个块
-    原理：把query也向量化，找向量距离最近的k个块 
-    """
 
-    collection_name=filename.replace(".","_").replace(" ","_")  
+def sanitize_collection_name(filename: str) -> str:
+    return filename.replace(".", "_").replace(" ", "_")
 
-    db = Chroma(
+def _tokenize(text: str) -> list[str]:
+    text = text.lower()
+    tokens = re.findall(r'[a-z0-9äöüß]+|[\u4e00-\u9fff]', text) #分词
+    return tokens
+
+def _build_bm25(docs:list[Document]) -> tuple[BM25Okapi, list[Document]]:
+    tokenized = [_tokenize(doc.page_content) for doc in docs] #把每个 chunk 的文字都分词，变成词列表的列表
+    bm25 = BM25Okapi(tokenized) #建立BM25索引
+    return bm25, docs #BM25 存词频，docs 存原始内容
+
+def _bm25_search(
+        query: str,
+        bm25: BM25Okapi,
+        docs: list[Document],
+        k: int = 5
+)->list[tuple[Document, float]]:
+    """
+    BM25 关键词检索
+    返回 [(Document, score), ...] 分数越高越相关
+    """
+    query_tokens = _tokenize(query)
+    scores = bm25.get_scores(query_tokens)
+    scored_docs = list(zip(docs, scores))
+    scored_docs = sorted(
+        zip(docs, scores),
+        key=lambda x: x[1],
+        reverse=True
+    )
+    return scored_docs[:k]
+
+def _reciprocal_rank_fusion(
+        vector_results: list[tuple[Document, float]],
+        bm25_results: list[tuple[Document, float]],
+        k: int=60
+)->list[tuple[Document, float]]:
+    """
+    RRF（倒数排名融合）算法
+    把向量检索和 BM25 的结果融合成一个排名
+
+    RRF 公式：score = Σ 1/(k + rank)
+    k=60 是经验常数，来自 RRF 论文
+    """
+    rrf_scores = {}
+    doc_map = {}
+
+    for rank, (doc, _) in enumerate(vector_results,start=1):
+        key=doc.page_content
+        rrf_scores[key] = rrf_scores.get(key, 0) + 1/(k + rank)
+        doc_map[key] = doc
+
+    for rank, (doc, _) in enumerate(bm25_results,start=1):
+        key=doc.page_content
+        rrf_scores[key] = rrf_scores.get(key, 0) + 1/(k + rank)
+        doc_map[key] = doc
+
+    sorted_items = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
+
+    return [(doc_map[key], score) for key, score in sorted_items]
+
+
+
+def search_chunks_with_score(query: str, filename: str, k: int = 5)-> tuple[list[tuple[Document, float]], float]:
+    """
+    混合检索：向量检索 + BM25，用 RRF 融合排名
+    """
+    collection_name = sanitize_collection_name(filename)
+
+    # vector search
+    db=Chroma(
         collection_name=collection_name,
         embedding_function=get_embedding_function(),
         persist_directory=CHROMA_DIR
     )
+    vector_results = db.similarity_search_with_score(query, k=k*2)  
+    print(f"[Vector] Found {len(vector_results)} chunks") 
+    if not vector_results:
+        return [], 999.0
+    best_cosine_score = min(score for _, score in vector_results)
+    print(f"[Vector] Best cosine score: {best_cosine_score}")
 
-    # similarity_search会把query用同一个Embedding模型转成向量,计算它与数据库里所有向量的余弦相似度,返回最相似的k个块
-    results = db.similarity_search(query, k=k)
+    # bm25 search
+    all_docs_results = db.similarity_search(query, k=100)
+    if all_docs_results:
+        bm25, docs = _build_bm25(all_docs_results)
+        bm25_results = _bm25_search(query, bm25, docs, k=k*2)
+        print(f"[BM25] Found {len(bm25_results)} chunks")
+    else:
+        bm25_results = []
 
-    return results
-
-def search_chunks_with_score(query: str, filename: str, k: int = 5):
-    """
-    和search_chunks一样，但同时返回相关性分数
-    分数是向量距离，越小说明越相关
-    """
-    collection_name = filename.replace(".","_").replace(" ","_")
-
-    print(f"[DEBUG] Searching in collection: {collection_name}")
-
-    db = Chroma(
-        collection_name=collection_name,
-        embedding_function=get_embedding_function(),
-        persist_directory=CHROMA_DIR
-    )
-
-    # 返回 [(Document, score), (Document, score), ...]
-    results = db.similarity_search_with_score(query, k=k)
-
-    print(f"[DEBUG] Found {len(results)} chunks")  # 加这行
-    if results:
-        print(f"[DEBUG] First chunk preview: {results[0][0].page_content[:100]}")
+    # RRF fused
+    results = _reciprocal_rank_fusion(vector_results, bm25_results, k=k*2)
+    final_results = results[:k]
     
-    return results
+    print(f"[Hybrid] Final top-{k} chunks selected")
+    return final_results, best_cosine_score
+
+def search_chunks(query: str, filename:str, k:int=5) -> list[Document]:
+    results, _ = search_chunks_with_score(query, filename, k)
+    return [doc for doc, _ in results] # 只返回文档，丢掉分数
 

@@ -19,6 +19,7 @@ from rag import store_chunks, search_chunks, search_chunks_with_score
 from memory import load_memory, save_memory, compress_history, update_memory, should_compress, load_quiz_memory, save_quiz_memory
 from database import get_db, SessionLocal
 from models import User, Course, PdfFile, Message, Note, Memory, QuizProgress
+from tools import search_web, generate_mermaid_chart
 
 # ---------- Requests --------------
 # Preview
@@ -226,12 +227,11 @@ async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
             history_text += f"{role_label}: {msg.content}\n"   
 
     # search for 5 relevant chunks and calculate relevance score
-    results_with_score = search_chunks_with_score(request.question, request.filename, k=5)
+    results_with_score, best_score = search_chunks_with_score(request.question, request.filename, k=5)
     if not results_with_score:
         raise HTTPException(status_code=404, detail=
                             "Relevant chunks not found. Please upload the PDF first.")
     
-    best_score=min(score for _, score in results_with_score)
     print(f"RAG Relevance Score: {best_score}")
     SCORE_THRESHOLD = 0.9  # 分数阈值：低于0.9说明PDF里有相关内容
 
@@ -244,127 +244,93 @@ async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
         learning_style_text = f"\nStudent's learning style: {memory['learning_style']}. Please adjust your answer accordingly."
 
 
-    if best_score < SCORE_THRESHOLD: 
-        print(f"RAG Relevance Score {best_score} below threshold, using PDF content to answer") 
-
-        context_parts=[]  
-        pages_used=set()  
+    # generate pdf search content
+    context_parts=[]  
+    pages_used=set()  
     
-        for chunk,score in results_with_score: 
-            context_parts.append(chunk.page_content) # page_content comes from LangChain
-            page_num=chunk.metadata.get("page",0)+1  # page starts from 0，so here +1 
-            pages_used.add(page_num) 
+    for chunk,score in results_with_score: 
+        context_parts.append(chunk.page_content) # page_content comes from LangChain
+        page_num=chunk.metadata.get("page",0)+1  # page starts from 0，so here +1 
+        pages_used.add(page_num) 
 
-        context = "\n\n---\n\n".join(context_parts) 
-        context = context[:2000]
-        source_type="pdf" 
-        sources = sorted(list(pages_used)) 
+    context = "\n\n---\n\n".join(context_parts) 
+    context = context[:2000]
+    sources = sorted(list(pages_used)) 
+    
+    pdf_system_prompt = f"""You are a learning assistant helping international students understand German lecture materials.
+        {weak_concepts_text}{learning_style_text}
+        Your task is to answer the student's question based on the provided lecture content.
 
-        system_prompt = f"""You are a learning assistant helping international students understand German lecture materials.
+        Rules:
+        - Answer in Chinese
+        - Be concise and direct, only address what the question asks
+        - Do not proactively add diagrams, formulas, or code blocks
+        - If the lecture content is relevant, answer strictly from it
+        - If the lecture content is not relevant to the question, say "讲义中未找到直接相关内容。"
+        - Keep the answer under 200 characters"""
+
+    pdf_user_prompt = f"""Lecture content:
+        {context}
+
+        {('Conversation history:\n' + history_text) if history_text else ''}
+        Student question: {request.question}"""
+    
+    pdf_response = claude.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=400,
+        system=pdf_system_prompt,
+        messages=[{"role": "user", "content": pdf_user_prompt}]
+    )
+    pdf_answer = pdf_response.content[0].text.strip()
+    print(f"PDF answer generated, score={best_score}")
+
+    #generate web-search answer if the content is not relevant
+    source_type = "pdf"
+    web_supplement = ""
+
+    if best_score >= SCORE_THRESHOLD: 
+        print(f"RAG Relevance Score {best_score} above threshold, adding web supplement") 
+
+        web_sources = []
+        tool_output = search_web.invoke(request.question)
+        tool_output = str(tool_output)
+        for line in tool_output.split("\n"):
+            if line.startswith("from:"):
+                web_sources.append(line.replace("from:", "").strip())
+        print(f"search_web returned, sources: {web_sources}")
+
+        supplement_system = f"""You are a learning assistant helping international students.
             {weak_concepts_text}{learning_style_text}
-            Your task is to answer the student's question based strictly on the provided lecture content.
 
             Rules:
-            - Answer ONLY based on the provided lecture content, do not add information not present in the original text
             - Always answer in Chinese
-            - Be concise and direct, only address what the question asks
-            - Do not proactively add diagrams, formulas, or code blocks
-            - Keep the answer under 150 characters"""
+            - Be concise, keep supplement under 200 characters
+            - Only use the web search results to supplement the PDF answer
+            - Do not repeat what the PDF answer already said"""
 
-        user_prompt = f"""Lecture content: {context}
-            {('Conversation history:\n' + history_text) if history_text else ''}
-            Student question: {request.question}"""
-        
-        answer = claude.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=400,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}]
-        )
-        answer = answer.content[0].text.strip()
-
-    else:
-        print(f"RAG Relevance Score {best_score} above threshold, using web search to answer")
-
-        from tools import CLAUDE_TOOLS, search_web, generate_mermaid_chart
-
-        first_prompt = f"""
-                You are a learning assistant helping international students understand lecture materials.
-                {weak_concepts_text}{learning_style_text}
-
-                Rules:
-                - Always answer in Chinese
-                - Be concise and direct, keep answer under 250 characters
-                - Only call search_web if you need current information to answer the question
-                - Only call generate_mermaid_chart if the question explicitly asks for a diagram
-                - If you can answer directly, do so without calling any tool"""
-        
-        first_response = claude.messages.create(
+        supplement_response = claude.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=500,
-            system=first_prompt,
-            tools=CLAUDE_TOOLS,
-            messages=[{"role": "user", "content": f"Student question: {request.question}"}],
+            system=supplement_system,
+            messages=[{"role": "user", "content": f"""PDF answer: {pdf_answer}
+                Web search results: {tool_output[:1500]}
+                Student question: {request.question}
+                Provide a brief supplement based on the web search results."""}]
         )
+        
+        web_supplement = supplement_response.content[0].text.strip()
+        source_type = "pdf+web"
+        sources = {"pages": sorted(list(pages_used)), "urls": web_sources}
 
-        tool_results = []
-        source_type = "web"
-        sources = []
-
-        if first_response.stop_reason == "tool_use":
-            for block in first_response.content:
-                if block.type == "tool_use":
-                    tool_name=block.name
-                    tool_input=block.input
-                    print(f"Claude Tool Use: {tool_name}, Parameter: {tool_input}")
-
-                    if tool_name == "search_web":
-                        tool_output = search_web.invoke(tool_input["query"])
-                        sources = []
-                        for line in tool_output.split("\n"):
-                            if line.startswith("from:"):
-                                sources.append(line.replace("from:", "").strip())
-                    elif tool_name == "generate_mermaid_chart":
-                        tool_output = await generate_mermaid_chart.ainvoke(tool_input["description"])
-                        sources = []
-                    else:
-                        tool_output = "Tool not found."
-
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": tool_output
-                    })
-            
-            second_prompt = f"""
-                        You are a learning assistant helping international students understand lecture materials.
-                        {weak_concepts_text}{learning_style_text}
-
-                        Rules:
-                        - Always answer in Chinese
-                        - Be concise and direct, keep answer under 250 characters
-                        - Only output diagrams or formulas if explicitly needed"""
-            second_response = claude.messages.create(
-                model="claude-sonnet-4-5",
-                max_tokens=500, 
-                system=second_prompt,
-                messages=[
-                    {"role": "user", "content": request.question},
-                    {"role": "assistant", "content": first_response.content},
-                    {"role": "user", "content": tool_results}
-                ]
-            )
-            answer = second_response.content[0].text
-
-        else:
-            print("Claude answered directly without tool use")
-            answer = first_response.content[0].text
-            source_type = "web"
-            sources = []
-
-    memory = update_memory(request.filename, request.question, answer, memory)
+    full_answer = f"{pdf_answer}\n{web_supplement}" if web_supplement else pdf_answer
+    memory = update_memory(request.filename, request.question, full_answer, memory)
     save_memory(request.filename, memory, request.course_id)
     
+    if source_type == "pdf+web":
+        final_sources = {"pages": sorted(list(pages_used)), "urls": web_sources}
+    else:
+        final_sources = {"pages": sorted(list(pages_used)), "urls": []}
+
     user_message = Message(
         pdf_file_id=pdf_file.id,
         role="user",
@@ -376,9 +342,9 @@ async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
     assistant_message = Message(
         pdf_file_id=pdf_file.id,
         role="assistant",
-        content=answer,
+        content=pdf_answer,
         source_type=source_type,
-        sources=sources
+        sources=final_sources.get("urls", []) if isinstance(final_sources, dict) else []
     )
 
     db.add(user_message)
@@ -387,9 +353,10 @@ async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
 
     return {
         "question": request.question,
-        "answer": answer,
+        "answer": pdf_answer,
+        "web_supplement": web_supplement,
         "source_type": source_type,
-        "sources": sources,
+        "sources": final_sources,
         "relevance": best_score<SCORE_THRESHOLD
     }
 

@@ -96,35 +96,3 @@ def generate_mermaid_chart(description: str) -> str:
             "```"
         )
 
-
-# Claude API Tool Calling
-CLAUDE_TOOLS = [
-    {
-        "name": "search_web",
-        "description": "Search the web for current information not found in the PDF. Use when the question requires information beyond the lecture content.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Search query in English or German"
-                }
-            },
-            "required": ["query"]
-        }
-    },
-    {
-        "name": "generate_mermaid_chart",
-        "description": "Generate a Mermaid diagram. Use ONLY when the question explicitly asks for a flow diagram, process visualization, or system architecture.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string",
-                    "description": "Short English description of what the diagram should show"
-                }
-            },
-            "required": ["description"]
-        }
-    }
-]
