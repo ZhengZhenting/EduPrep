@@ -12,6 +12,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy.orm import Session
 from wasabi import msg
+from observability import langfuse, logger, generate_request_id
 
 
 from pdf_processor import process_pdf
@@ -201,155 +202,212 @@ async def get_upload_status(filename: str):
     return upload_progress[filename]
 
 
-@app.post("/ask") 
+@app.post("/ask")
 async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
-    pdf_file = db.query(PdfFile).filter(
-        PdfFile.filename==request.filename,
-        PdfFile.course_id==request.course_id
-    ).first() 
+    request_id = generate_request_id()
+    logger.info(f"[{request_id}] /ask started | filename={request.filename} | question={request.question[:50]}")
 
-    if not pdf_file:
-        raise HTTPException(status_code=404, detail="PDF file not found in database.")
-    
-    memory = load_memory(request.filename, request.course_id)
+    with langfuse.start_as_current_observation(
+        as_type="span",
+        name="ask",
+        input={
+            "question": request.question,
+            "filename": request.filename,
+            "course_id": request.course_id
+        }
+    ) as root_span:
 
-    # 对话历史
-    history_text=""
-    if should_compress(request.history, memory):
-        print("More than 6 messages, compressing...")
-        summary=compress_history(request.history, memory)
-        memory["history_summary"]=summary
-        history_text=f"History: {summary}\n"
-        print(f"History Summary: {summary}")
-    else:
-        for msg in request.history[-6:]:  # save only 6 recent messages
-            role_label="Student" if msg.role=="user" else "Assistant"
-            history_text += f"{role_label}: {msg.content}\n"   
+        pdf_file = db.query(PdfFile).filter(
+            PdfFile.filename == request.filename,
+            PdfFile.course_id == request.course_id
+        ).first()
 
-    # search for 5 relevant chunks and calculate relevance score
-    results_with_score, best_score = search_chunks_with_score(request.question, request.filename, k=5)
-    if not results_with_score:
-        raise HTTPException(status_code=404, detail=
-                            "Relevant chunks not found. Please upload the PDF first.")
-    
-    print(f"RAG Relevance Score: {best_score}")
-    SCORE_THRESHOLD = 0.9  # 分数阈值：低于0.9说明PDF里有相关内容
+        if not pdf_file:
+            raise HTTPException(status_code=404, detail="PDF file not found in database.")
 
-    weak_concepts_text = ""
-    if memory.get("weak_concepts"):
-        weak_concepts_text = f"\nStudent's weak concepts: {', '.join(memory['weak_concepts'])}. Please elaborate more on these when relevant."
+        memory = load_memory(request.filename, request.course_id)
 
-    learning_style_text = ""
-    if memory.get("learning_style") and memory["learning_style"] != "未知":
-        learning_style_text = f"\nStudent's learning style: {memory['learning_style']}. Please adjust your answer accordingly."
+        history_text = ""
+        if should_compress(request.history, memory):
+            print("More than 6 messages, compressing...")
+            summary = compress_history(request.history, memory)
+            memory["history_summary"] = summary
+            history_text = f"History: {summary}\n"
+            print(f"History Summary: {summary}")
+        else:
+            for msg in request.history[-6:]:
+                role_label = "Student" if msg.role == "user" else "Assistant"
+                history_text += f"{role_label}: {msg.content}\n"
 
+        SCORE_THRESHOLD = 0.9
 
-    # generate pdf search content
-    context_parts=[]  
-    pages_used=set()  
-    
-    for chunk,score in results_with_score: 
-        context_parts.append(chunk.page_content) # page_content comes from LangChain
-        page_num=chunk.metadata.get("page",0)+1  # page starts from 0，so here +1 
-        pages_used.add(page_num) 
+        with langfuse.start_as_current_observation(
+            as_type="span",
+            name="rag-retrieval",
+            input={"query": request.question}
+        ) as rag_span:
+            results_with_score, best_score = search_chunks_with_score(
+                request.question, request.filename, k=5
+            )
+            if not results_with_score:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Relevant chunks not found. Please upload the PDF first."
+                )
 
-    context = "\n\n---\n\n".join(context_parts) 
-    context = context[:2000]
-    sources = sorted(list(pages_used)) 
-    
-    pdf_system_prompt = f"""You are a learning assistant helping international students understand German lecture materials.
-        {weak_concepts_text}{learning_style_text}
-        Your task is to answer the student's question based on the provided lecture content.
+            rag_span.update(
+                output={
+                    "best_cosine_score": best_score,
+                    "chunks_found": len(results_with_score),
+                    "branch": "pdf" if best_score < SCORE_THRESHOLD else "pdf+web"
+                }
+            )
 
-        Rules:
-        - Answer in Chinese
-        - Be concise and direct, only address what the question asks
-        - Do not proactively add diagrams, formulas, or code blocks
-        - If the lecture content is relevant, answer strictly from it
-        - If the lecture content is not relevant to the question, say "讲义中未找到直接相关内容。"
-        - Keep the answer under 200 characters"""
+        print(f"RAG Relevance Score: {best_score}")
+        logger.info(f"[{request_id}] RAG score={best_score:.4f}")
 
-    pdf_user_prompt = f"""Lecture content:
-        {context}
+        weak_concepts_text = ""
+        if memory.get("weak_concepts"):
+            weak_concepts_text = f"\nStudent's weak concepts: {', '.join(memory['weak_concepts'])}. Please elaborate more on these when relevant."
 
-        {('Conversation history:\n' + history_text) if history_text else ''}
-        Student question: {request.question}"""
-    
-    pdf_response = claude.messages.create(
-        model="claude-sonnet-4-5",
-        max_tokens=400,
-        system=pdf_system_prompt,
-        messages=[{"role": "user", "content": pdf_user_prompt}]
-    )
-    pdf_answer = pdf_response.content[0].text.strip()
-    print(f"PDF answer generated, score={best_score}")
+        learning_style_text = ""
+        if memory.get("learning_style") and memory["learning_style"] != "未知":
+            learning_style_text = f"\nStudent's learning style: {memory['learning_style']}. Please adjust your answer accordingly."
 
-    #generate web-search answer if the content is not relevant
-    source_type = "pdf"
-    web_supplement = ""
+        context_parts = []
+        pages_used = set()
+        for chunk, score in results_with_score:
+            context_parts.append(chunk.page_content)
+            page_num = chunk.metadata.get("page", 0) + 1
+            pages_used.add(page_num)
 
-    if best_score >= SCORE_THRESHOLD: 
-        print(f"RAG Relevance Score {best_score} above threshold, adding web supplement") 
+        context = "\n\n---\n\n".join(context_parts)[:2000]
 
-        web_sources = []
-        tool_output = search_web.invoke(request.question)
-        tool_output = str(tool_output)
-        for line in tool_output.split("\n"):
-            if line.startswith("from:"):
-                web_sources.append(line.replace("from:", "").strip())
-        print(f"search_web returned, sources: {web_sources}")
-
-        supplement_system = f"""You are a learning assistant helping international students.
+        pdf_system_prompt = f"""You are a learning assistant helping international students understand German lecture materials.
             {weak_concepts_text}{learning_style_text}
+            Your task is to answer the student's question based on the provided lecture content.
 
             Rules:
-            - Always answer in Chinese
-            - Be concise, keep supplement under 200 characters
-            - Only use the web search results to supplement the PDF answer
-            - Do not repeat what the PDF answer already said"""
+            - Answer in Chinese
+            - Be concise and direct, only address what the question asks
+            - Do not proactively add diagrams, formulas, or code blocks
+            - If the lecture content is relevant, answer strictly from it
+            - If the lecture content is not relevant to the question, say "讲义中未找到直接相关内容。"
+            - Keep the answer under 200 characters"""
 
-        supplement_response = claude.messages.create(
+        pdf_user_prompt = f"""Lecture content:
+            {context}
+
+            {('Conversation history:\n' + history_text) if history_text else ''}
+            Student question: {request.question}"""
+
+        with langfuse.start_as_current_observation(
+            as_type="generation",
+            name="pdf-answer",
             model="claude-sonnet-4-5",
-            max_tokens=500,
-            system=supplement_system,
-            messages=[{"role": "user", "content": f"""PDF answer: {pdf_answer}
-                Web search results: {tool_output[:1500]}
-                Student question: {request.question}
-                Provide a brief supplement based on the web search results."""}]
+            input={"system": pdf_system_prompt[:300], "user": pdf_user_prompt[:300]}
+        ) as pdf_gen:
+            pdf_response = claude.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=400,
+                system=pdf_system_prompt,
+                messages=[{"role": "user", "content": pdf_user_prompt}]
+            )
+            pdf_answer = pdf_response.content[0].text.strip()
+
+            pdf_gen.update(
+                output=pdf_answer,
+                usage_details={
+                    "input": pdf_response.usage.input_tokens,
+                    "output": pdf_response.usage.output_tokens
+                }
+            )
+
+        print(f"PDF answer generated, score={best_score}")
+        logger.info(f"[{request_id}] PDF answer | tokens={pdf_response.usage.input_tokens}+{pdf_response.usage.output_tokens}")
+
+        source_type = "pdf"
+        web_supplement = ""
+        web_sources = []
+
+        if best_score >= SCORE_THRESHOLD:
+            print(f"RAG Relevance Score {best_score} above threshold, adding web supplement")
+
+            tool_output = str(search_web.invoke(request.question))
+            for line in tool_output.split("\n"):
+                if line.startswith("from:"):
+                    web_sources.append(line.replace("from:", "").strip())
+            print(f"search_web returned, sources: {web_sources}")
+
+            supplement_system = f"""You are a learning assistant helping international students.
+                {weak_concepts_text}{learning_style_text}
+
+                Rules:
+                - Always answer in Chinese
+                - Be concise, keep supplement under 200 characters
+                - Only use the web search results to supplement the PDF answer
+                - Do not repeat what the PDF answer already said"""
+
+            with langfuse.start_as_current_observation(
+                as_type="generation",
+                name="web-supplement",
+                model="claude-sonnet-4-5",
+                input={"question": request.question}
+            ) as web_gen:
+                supplement_response = claude.messages.create(
+                    model="claude-sonnet-4-5",
+                    max_tokens=500,
+                    system=supplement_system,
+                    messages=[{"role": "user", "content": f"""PDF answer: {pdf_answer}
+                        Web search results: {tool_output[:1500]}
+                        Student question: {request.question}
+                        Provide a brief supplement based on the web search results."""}]
+                )
+
+                web_supplement = supplement_response.content[0].text.strip()
+                source_type = "pdf+web"
+
+                web_gen.update(
+                    output=web_supplement,
+                    usage_details={
+                        "input": supplement_response.usage.input_tokens,
+                        "output": supplement_response.usage.output_tokens
+                    }
+                )
+
+        root_span.update(
+            output={"source_type": source_type, "answer_length": len(pdf_answer)}
         )
-        
-        web_supplement = supplement_response.content[0].text.strip()
-        source_type = "pdf+web"
-        sources = {"pages": sorted(list(pages_used)), "urls": web_sources}
+        logger.info(f"[{request_id}] /ask completed | source_type={source_type}")
 
-    full_answer = f"{pdf_answer}\n{web_supplement}" if web_supplement else pdf_answer
-    memory = update_memory(request.filename, request.question, full_answer, memory)
-    save_memory(request.filename, memory, request.course_id)
-    
-    if source_type == "pdf+web":
-        final_sources = {"pages": sorted(list(pages_used)), "urls": web_sources}
-    else:
-        final_sources = {"pages": sorted(list(pages_used)), "urls": []}
+        full_answer = f"{pdf_answer}\n{web_supplement}" if web_supplement else pdf_answer
+        memory = update_memory(request.filename, request.question, full_answer, memory)
+        save_memory(request.filename, memory, request.course_id)
 
-    user_message = Message(
-        pdf_file_id=pdf_file.id,
-        role="user",
-        content=request.question,
-        source_type=None,
-        sources=None
-    )
+        final_sources = {
+            "pages": sorted(list(pages_used)),
+            "urls": web_sources if source_type == "pdf+web" else []
+        }
 
-    assistant_message = Message(
-        pdf_file_id=pdf_file.id,
-        role="assistant",
-        content=pdf_answer,
-        source_type=source_type,
-        sources=final_sources.get("urls", []) if isinstance(final_sources, dict) else []
-    )
+        user_message = Message(
+            pdf_file_id=pdf_file.id,
+            role="user",
+            content=request.question,
+            source_type=None,
+            sources=None
+        )
+        assistant_message = Message(
+            pdf_file_id=pdf_file.id,
+            role="assistant",
+            content=pdf_answer,
+            source_type=source_type,
+            sources=final_sources.get("urls", [])
+        )
+        db.add(user_message)
+        db.add(assistant_message)
+        db.commit()
 
-    db.add(user_message)
-    db.add(assistant_message)
-    db.commit()
+    langfuse.flush()
 
     return {
         "question": request.question,
@@ -357,7 +415,7 @@ async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
         "web_supplement": web_supplement,
         "source_type": source_type,
         "sources": final_sources,
-        "relevance": best_score<SCORE_THRESHOLD
+        "relevance": best_score < SCORE_THRESHOLD
     }
 
 
@@ -390,101 +448,144 @@ async def get_messages(filename: str, course_id: int = Form(1), db: Session = De
 
 @app.post("/preview")
 async def generate_preview(request: PreviewRequest):
-    queries = [
-        "What is the main topic of this lecture?",
-        "What are the key technical terms and their definitions?"
-    ]
+    request_id = generate_request_id()
+    logger.info(f"[{request_id}] /preview started | filename={request.filename}")
 
-    all_chunks=[]
-    seen_contents=set() 
+    with langfuse.start_as_current_observation(
+        as_type="span",
+        name="preview",
+        input={"filename": request.filename}
+    ) as root_span:
 
-    for query in queries:
-        chunks = search_chunks(query, request.filename, k=3)
-        for chunk in chunks:
-            if chunk.page_content not in seen_contents:
-                all_chunks.append(chunk)
-                seen_contents.add(chunk.page_content)
+        queries = [
+            "What is the main topic of this lecture?",
+            "What are the key technical terms and their definitions?"
+        ]
 
-    if not all_chunks:
-        raise HTTPException(status_code=404, detail="Relevant chunks not found. Please upload the PDF first.")
-    
-    context = "\n\n---\n\n".join([c.page_content for c in all_chunks])
-    context = context[:2000]
+        all_chunks = []
+        seen_contents = set()
+        for query in queries:
+            chunks = search_chunks(query, request.filename, k=3)
+            for chunk in chunks:
+                if chunk.page_content not in seen_contents:
+                    all_chunks.append(chunk)
+                    seen_contents.add(chunk.page_content)
 
-    parser = JsonOutputParser(pydantic_object=PreviewResponse)
+        if not all_chunks:
+            raise HTTPException(
+                status_code=404,
+                detail="Relevant chunks not found. Please upload the PDF first."
+            )
 
-    system_prompt = f"""
-                You are an academic assistant helping international students understand lecture materials.
-                Output ONLY a valid JSON object. Do not wrap in markdown code blocks. No explanation."""
+        context = "\n\n---\n\n".join([c.page_content for c in all_chunks])[:2000]
 
-    user_prompt = f"""
-                Lecture content:
-                {context}
-                {parser.get_format_instructions()}
-                
-                Rules:
-                - summary_de: 5 sentences in German
-                - summary_zh: 5 sentences in Chinese
-                - vocabulary: exactly 10 most important technical terms, each with German term and Chinese translation
-                - Output ONLY the JSON, no markdown, no explanation"""
-    
-    message = claude.messages.create(
-        model="claude-sonnet-4-5",
-        max_tokens=1200,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_prompt}]
-    )
+        parser = JsonOutputParser(pydantic_object=PreviewResponse)
 
-    raw_text = message.content[0].text.strip()
+        system_prompt = f"""
+                    You are an academic assistant helping international students understand lecture materials.
+                    Output ONLY a valid JSON object. Do not wrap in markdown code blocks. No explanation."""
 
-    # clear markdown
-    if raw_text.startswith("```"):
-        raw_text = raw_text.split("\n", 1)[-1]
-    if raw_text.endswith("```"):
-        raw_text = raw_text.rsplit("```", 1)[0].strip()
-
-    try:
-        preview_data =  json.loads(raw_text)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse preview response: {e}")
-    
-    vocab_list = []
-    for item in preview_data.get("vocabulary", []):
-        if isinstance(item, dict):
-            vocab_list.append(f"{item.get('term', '')} ({item.get('translation', '')})")
-        else:
-            vocab_list.append(str(item))
-
-    # Mindmap
-    system_prompt_mindmap = f"""
-                    You are a Mermaid diagram expert. 
-                    Output ONLY valid Mermaid mindmap syntax. 
-                    No markdown fences, no explanation, no text before or after."""
-    mindmap_prompt = f"""
-                    Generate a Mermaid mindmap showing the structure of this lecture.
-                    Lecture content:{context}
+        user_prompt = f"""
+                    Lecture content:
+                    {context}
+                    {parser.get_format_instructions()}
 
                     Rules:
-                    - Use mindmap type
-                    - Maximum 3 levels deep
-                    - Maximum 15 nodes total
-                    - All labels in German as they appear in the lecture
-                    - Keep node labels short, max 4 words
-                    - Output ONLY the Mermaid syntax, no markdown fences, no explanation"""
-    mindmap_message = claude.messages.create(
-        model="claude-sonnet-4-5",
-        max_tokens=1000,
-        system=system_prompt_mindmap,
-        messages=[{"role": "user", "content": mindmap_prompt}]
-    )
-    mindmap_raw = mindmap_message.content[0].text.strip()
-    # clear possible markdown marks
-    if mindmap_raw.startswith("```"):
-        mindmap_raw = mindmap_raw.split("\n", 1)[-1]
-    if mindmap_raw.endswith("```"):
-        mindmap_raw = mindmap_raw.rsplit("```", 1)[0].strip()
+                    - summary_de: 5 sentences in German
+                    - summary_zh: 5 sentences in Chinese
+                    - vocabulary: exactly 10 most important technical terms, each with German term and Chinese translation
+                    - Output ONLY the JSON, no markdown, no explanation"""
 
-    mindmap = f"```mermaid\n{mindmap_raw}\n```"
+        with langfuse.start_as_current_observation(
+            as_type="generation",
+            name="preview-summary",
+            model="claude-sonnet-4-5",
+            input={"system": system_prompt, "user": user_prompt}
+        ) as summary_gen:
+            message = claude.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=1200,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}]
+            )
+            raw_text = message.content[0].text.strip()
+            if raw_text.startswith("```"):
+                raw_text = raw_text.split("\n", 1)[-1]
+            if raw_text.endswith("```"):
+                raw_text = raw_text.rsplit("```", 1)[0].strip()
+
+            summary_gen.update(
+                output=raw_text,
+                usage_details={
+                    "input": message.usage.input_tokens,
+                    "output": message.usage.output_tokens
+                }
+            )
+
+        try:
+            preview_data = json.loads(raw_text)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=500, detail=f"Failed to parse preview response: {e}")
+
+        logger.info(f"[{request_id}] Preview summary generated | input_tokens={message.usage.input_tokens}")
+
+        vocab_list = []
+        for item in preview_data.get("vocabulary", []):
+            if isinstance(item, dict):
+                vocab_list.append(f"{item.get('term', '')} ({item.get('translation', '')})")
+            else:
+                vocab_list.append(str(item))
+
+        system_prompt_mindmap = f"""
+                        You are a Mermaid diagram expert.
+                        Output ONLY valid Mermaid mindmap syntax.
+                        No markdown fences, no explanation, no text before or after."""
+        mindmap_prompt = f"""
+                        Generate a Mermaid mindmap showing the structure of this lecture.
+                        Lecture content:{context}
+
+                        Rules:
+                        - Use mindmap type
+                        - Maximum 3 levels deep
+                        - Maximum 15 nodes total
+                        - All labels in German as they appear in the lecture
+                        - Keep node labels short, max 4 words
+                        - Output ONLY the Mermaid syntax, no markdown fences, no explanation"""
+
+        with langfuse.start_as_current_observation(
+            as_type="generation",
+            name="preview-mindmap",
+            model="claude-sonnet-4-5",
+            input={"system": system_prompt_mindmap, "user": mindmap_prompt}
+        ) as mindmap_gen:
+            mindmap_message = claude.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=1000,
+                system=system_prompt_mindmap,
+                messages=[{"role": "user", "content": mindmap_prompt}]
+            )
+            mindmap_raw = mindmap_message.content[0].text.strip()
+            if mindmap_raw.startswith("```"):
+                mindmap_raw = mindmap_raw.split("\n", 1)[-1]
+            if mindmap_raw.endswith("```"):
+                mindmap_raw = mindmap_raw.rsplit("```", 1)[0].strip()
+
+            mindmap_gen.update(
+                output=mindmap_raw,
+                usage_details={
+                    "input": mindmap_message.usage.input_tokens,
+                    "output": mindmap_message.usage.output_tokens
+                }
+            )
+
+        mindmap = f"```mermaid\n{mindmap_raw}\n```"
+
+        logger.info(f"[{request_id}] Preview mindmap generated | input_tokens={mindmap_message.usage.input_tokens}")
+
+        root_span.update(output={"vocab_count": len(vocab_list)})
+
+    langfuse.flush()
+    logger.info(f"[{request_id}] /preview completed")
 
     return {
         "filename": request.filename,
@@ -497,17 +598,17 @@ async def generate_preview(request: PreviewRequest):
 
 @app.post("/quiz")
 async def generate_quiz(request: QuizRequest):
-    # get weak concepts
+    request_id = generate_request_id()
+    logger.info(f"[{request_id}] /quiz started | filename={request.filename} | num_questions={request.num_questions}")
+
     conv_memory = load_memory(request.filename, request.course_id)
     weak_concepts = conv_memory.get("weak_concepts", [])
     print(f"weak_concepts: {weak_concepts}")
 
-    # get quiz history scores
     quiz_memory = load_quiz_memory(request.filename, request.course_id)
     average_score = quiz_memory.get("average_score", 0.0)
     print(f"average_score: {average_score}")
 
-    # difficulty estimation
     if average_score == 0.0:
         difficulty_hint = "Generate a mix of basic and intermediate questions."
     elif average_score < 0.6:
@@ -517,84 +618,110 @@ async def generate_quiz(request: QuizRequest):
     else:
         difficulty_hint = "Generate a mix of basic and intermediate questions."
 
-    # weak concepts prompt
     weak_concepts_text = ""
     if weak_concepts:
         weak_concepts_text = f"Prioritize questions about these concepts the student is weak on: {', '.join(weak_concepts)}"
 
-    # search for relevant chunks
-    queries=[
-             "What are the main concepts and definitions?",
-             "What are the key technical terms and their applications?",
-             "What are the important rules, principles or methods?"
-    ]
+    with langfuse.start_as_current_observation(
+        as_type="span",
+        name="quiz",
+        input={
+            "filename": request.filename,
+            "num_questions": request.num_questions,
+            "difficulty": difficulty_hint,
+            "average_score": average_score
+        }
+    ) as root_span:
 
-    all_chunks=[]
-    seen_contents=set()
+        queries = [
+            "What are the main concepts and definitions?",
+            "What are the key technical terms and their applications?",
+            "What are the important rules, principles or methods?"
+        ]
 
-    for query in queries:
+        all_chunks = []
+        seen_contents = set()
+        for query in queries:
             chunks = search_chunks(query, request.filename, k=3)
             for chunk in chunks:
                 if chunk.page_content not in seen_contents:
                     all_chunks.append(chunk)
                     seen_contents.add(chunk.page_content)
 
-    if not all_chunks:
-            raise HTTPException(status_code=404, detail="Relevant chunks not found. Please upload the PDF first.")
-        
-    context = "\n\n---\n\n".join([c.page_content for c in all_chunks])
-    context = context[:2500]  
+        if not all_chunks:
+            raise HTTPException(
+                status_code=404,
+                detail="Relevant chunks not found. Please upload the PDF first."
+            )
 
-    parser = JsonOutputParser(pydantic_object=QuizResponse)
+        context = "\n\n---\n\n".join([c.page_content for c in all_chunks])[:2500]
 
-    system_prompt = f""""
-            You are a learning assistant creating multiple choice questions for students.
-            Output ONLY a valid JSON object. Do not wrap in markdown code blocks. No explanation."""
-    
-    user_prompt=f"""
-            Lecture content: {context}
+        parser = JsonOutputParser(pydantic_object=QuizResponse)
 
-            {difficulty_hint} 
-            {weak_concepts_text}
+        system_prompt = f"""
+                You are a learning assistant creating multiple choice questions for students.
+                Output ONLY a valid JSON object. Do not wrap in markdown code blocks. No explanation."""
 
-            {parser.get_format_instructions()}
+        user_prompt = f"""
+                Lecture content: {context}
 
-            Rules:
-            - Generate exactly {request.num_questions} questions
-            - Each question must be based strictly on the lecture content
-            - Questions must be in German
-            - Only one option is correct
-            - answer field must be exactly one of: A, B, C, D
-            - explanation must be in Chinese, 1-2 sentences
-            - Options must cover plausible wrong answers"""
-        
-    message = claude.messages.create(
-        model="claude-sonnet-4-5",
-        max_tokens=2000,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_prompt}]
-    )
+                {difficulty_hint}
+                {weak_concepts_text}
 
-    raw_text = message.content[0].text.strip()
+                {parser.get_format_instructions()}
 
-    # clear possible markdown marks
-    if raw_text.startswith("```"):
-        raw_text = raw_text.split("\n", 1)[-1]
-    if raw_text.endswith("```"):
-        raw_text = raw_text.rsplit("```", 1)[0].strip()
+                Rules:
+                - Generate exactly {request.num_questions} questions
+                - Each question must be based strictly on the lecture content
+                - Questions must be in German
+                - Only one option is correct
+                - answer field must be exactly one of: A, B, C, D
+                - explanation must be in Chinese, 1-2 sentences
+                - Options must cover plausible wrong answers"""
 
-    try:
-        quiz_data = json.loads(raw_text)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse quiz response: {e}")
+        with langfuse.start_as_current_observation(
+            as_type="generation",
+            name="quiz-generation",
+            model="claude-sonnet-4-5",
+            input={"system": system_prompt, "user": user_prompt}
+        ) as quiz_gen:
+            message = claude.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=2000,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}]
+            )
+            raw_text = message.content[0].text.strip()
+            if raw_text.startswith("```"):
+                raw_text = raw_text.split("\n", 1)[-1]
+            if raw_text.endswith("```"):
+                raw_text = raw_text.rsplit("```", 1)[0].strip()
 
-    questions=quiz_data.get("questions", [])
-    if not questions:
+            quiz_gen.update(
+                output=raw_text,
+                usage_details={
+                    "input": message.usage.input_tokens,
+                    "output": message.usage.output_tokens
+                }
+            )
+
+        try:
+            quiz_data = json.loads(raw_text)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=500, detail=f"Failed to parse quiz response: {e}")
+
+        questions = quiz_data.get("questions", [])
+        if not questions:
             raise HTTPException(status_code=500, detail="No questions generated.")
-    
+
+        root_span.update(output={"questions_count": len(questions)})
+
+    langfuse.flush()
+    logger.info(f"[{request_id}] /quiz completed | questions_generated={len(questions)}")
+
     return {
-            "filename": request.filename,
-            "questions": questions
+        "filename": request.filename,
+        "questions": questions
     }
 
 
