@@ -21,8 +21,26 @@ from memory import load_memory, save_memory, compress_history, update_memory, sh
 from database import get_db, SessionLocal
 from models import User, Course, PdfFile, Message, Note, Memory, QuizProgress
 from tools import search_web, generate_mermaid_chart
+from auth import (
+    hash_password, verify_password,
+    create_access_token, create_refresh_token,
+    decode_token, get_current_user
+)
 
 # ---------- Requests --------------
+# Auth Request Models
+class RegisterRequest(BaseModel):
+    email: str
+    name: str
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
 # Preview
 class PreviewRequest(BaseModel):
     filename: str
@@ -94,11 +112,6 @@ class QuizQuestion(BaseModel):
 class QuizResponse(BaseModel):
     questions: List[QuizQuestion] = Field(description="List of quiz questions")
 
-class QuizResultRequest(BaseModel):
-    filename: str
-    course_id: int = Form(1)
-    score: int
-    total: int
 
 # create FastAPI application, test: http://localhost:8000/docs, uvicorn running on: http://127.0.0.1:8000
 app = FastAPI()
@@ -119,13 +132,81 @@ app.add_middleware(
 upload_progress = {}
 executor = ThreadPoolExecutor()
 
+@app.post("/auth/register")
+async def register(request: RegisterRequest, db: Session = Depends(get_db)): 
+    existing = db.query(User).filter(User.email == request.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    user = User(
+        email=request.email,
+        name=request.name,
+        password_hash=hash_password(request.password)
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    default_course=Course(user_id=user.id,title="Default Course")
+    db.add(default_course)
+    db.commit()
+
+    return{
+        "id":user.id,
+        "email":user.email,
+        "name":user.name
+    }
+
+
+@app.post("/auth/login")
+async def login(request: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email==request.email).first()
+
+    if not user or not verify_password(request.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    return {
+        "access_token": create_access_token(user.id),
+        "refresh_token": create_refresh_token(user.id),
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name
+        }
+    }
+
+
+@app.post("/auth/refresh")
+async def refresh_token(request: RefreshRequest, db: Session = Depends(get_db)):
+    payload=decode_token(request.refresh_token)
+
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Not a refresh token")
+    
+    user_id = int(payload.get("sub"))
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return {
+        "access_token": create_access_token(user.id),
+        "token_type": "bearer"
+    }
+
+
 @app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...), course_id: int = Form(1), db: Session = Depends(get_db)):
+async def upload_pdf(file: UploadFile = File(...), 
+                     course_id: int = Form(1), 
+                     db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user) #auth
+):
     
     content = await file.read()  
     filename=file.filename
 
-    course = db.query(Course).filter(Course.id==course_id).first()
+    course = db.query(Course).filter(Course.id==course_id, Course.user_id==current_user.id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found in database.")
     
@@ -196,14 +277,16 @@ def process_pdf_background(content:bytes, filename:str, pdf_file_id: int):
 
 
 @app.get("/upload/status/{filename}")
-async def get_upload_status(filename: str):
+async def get_upload_status(filename: str,current_user: User = Depends(get_current_user)):
     if filename not in upload_progress:
         raise HTTPException(status_code=404, detail="File not found")
     return upload_progress[filename]
 
 
 @app.post("/ask")
-async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
+async def ask_question(request: QuestionRequest, 
+                       db: Session = Depends(get_db),
+                       current_user: User = Depends(get_current_user)):
     request_id = generate_request_id()
     logger.info(f"[{request_id}] /ask started | filename={request.filename} | question={request.question[:50]}")
 
@@ -216,6 +299,13 @@ async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
             "course_id": request.course_id
         }
     ) as root_span:
+        
+        course =db.query(Course).filter(
+        Course.id==request.course_id,
+        Course.user_id == current_user.id).first()
+
+        if not course:
+            raise HTTPException(status_code=403, detail="Not authorized.")
 
         pdf_file = db.query(PdfFile).filter(
             PdfFile.filename == request.filename,
@@ -420,7 +510,17 @@ async def ask_question(request: QuestionRequest, db: Session = Depends(get_db)):
 
 
 @app.get("/message/{filename}")
-async def get_messages(filename: str, course_id: int = Form(1), db: Session = Depends(get_db)):
+async def get_messages(filename: str, 
+                       course_id: int = 1, 
+                       db: Session = Depends(get_db),
+                       current_user: User = Depends(get_current_user)):
+    course =db.query(Course).filter(
+        Course.id==course_id,
+        Course.user_id == current_user.id).first()
+
+    if not course:
+        raise HTTPException(status_code=403, detail="Not authorized.")
+
     pdf_file = db.query(PdfFile).filter(
         PdfFile.filename==filename,
         PdfFile.course_id==course_id
@@ -428,6 +528,7 @@ async def get_messages(filename: str, course_id: int = Form(1), db: Session = De
 
     if not pdf_file:
         raise HTTPException(status_code=404, detail="PDF file not found in database.")
+    
     
     messages = db.query(Message).filter(
         Message.pdf_file_id==pdf_file.id
@@ -447,7 +548,7 @@ async def get_messages(filename: str, course_id: int = Form(1), db: Session = De
 
 
 @app.post("/preview")
-async def generate_preview(request: PreviewRequest):
+async def generate_preview(request: PreviewRequest,current_user: User = Depends(get_current_user)):
     request_id = generate_request_id()
     logger.info(f"[{request_id}] /preview started | filename={request.filename}")
 
@@ -597,7 +698,7 @@ async def generate_preview(request: PreviewRequest):
 
 
 @app.post("/quiz")
-async def generate_quiz(request: QuizRequest):
+async def generate_quiz(request: QuizRequest,current_user: User = Depends(get_current_user)):
     request_id = generate_request_id()
     logger.info(f"[{request_id}] /quiz started | filename={request.filename} | num_questions={request.num_questions}")
 
@@ -726,13 +827,22 @@ async def generate_quiz(request: QuizRequest):
 
 
 @app.post("/quiz/result")
-async def save_quiz_result(request: QuizResultRequest):
+async def save_quiz_result(request: QuizResultRequest,current_user: User = Depends(get_current_user)):
     save_quiz_memory(request.filename, request.score, request.total, request.course_id)
     return {"message": "Quiz result saved successfully"}
 
 
 @app.post("/notes")
-async def create_note(request: NoteCreateRequest, db: Session = Depends(get_db)):
+async def create_note(request: NoteCreateRequest, 
+                      db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user)):
+    course =db.query(Course).filter(
+        Course.id==request.course_id,
+        Course.user_id == current_user.id).first()
+
+    if not course:
+        raise HTTPException(status_code=403, detail="Not authorized.")
+
     pdf_file = db.query(PdfFile).filter(
         PdfFile.filename==request.filename,
         PdfFile.course_id==request.course_id
@@ -760,7 +870,17 @@ async def create_note(request: NoteCreateRequest, db: Session = Depends(get_db))
 
 
 @app.get("/notes/{filename}")
-async def get_notes(filename: str, course_id: int = Form(1), db: Session = Depends(get_db)):
+async def get_notes(filename: str, 
+                    course_id: int = 1, 
+                    db: Session = Depends(get_db),
+                    current_user: User = Depends(get_current_user)):
+    course =db.query(Course).filter(
+        Course.id==course_id,
+        Course.user_id == current_user.id).first()
+
+    if not course:
+        raise HTTPException(status_code=403, detail="Not authorized.")
+    
     pdf_file = db.query(PdfFile).filter(
         PdfFile.filename==filename,
         PdfFile.course_id==course_id
@@ -787,11 +907,22 @@ async def get_notes(filename: str, course_id: int = Form(1), db: Session = Depen
 
 
 @app.delete("/notes/{note_id}")
-async def delete_note(note_id: int, db: Session = Depends(get_db)):
+async def delete_note(note_id: int, 
+                      db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user)):
     note = db.query(Note).filter(Note.id==note_id).first()
 
     if not note:
         raise HTTPException(status_code=404, detail="Note not found.")
+    
+    pdf_file = db.query(PdfFile).filter(PdfFile.id == note.pdf_file_id).first()
+    course = db.query(Course).filter(
+        Course.id == pdf_file.course_id,
+        Course.user_id == current_user.id
+    ).first()
+
+    if not course:
+        raise HTTPException(status_code=403, detail="Not authorized.")
     
     db.delete(note)
     db.commit()
@@ -800,9 +931,12 @@ async def delete_note(note_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/courses")
-async def create_course(request: CourseCreateRequest, db: Session = Depends(get_db)):
+async def create_course(request: CourseCreateRequest, 
+                        db: Session = Depends(get_db),
+                        current_user: User = Depends(get_current_user)
+):
     course = Course(
-        user_id=1, 
+        user_id=current_user.id, 
         title=request.title
     )
 
@@ -819,8 +953,9 @@ async def create_course(request: CourseCreateRequest, db: Session = Depends(get_
 
 
 @app.get("/courses")
-async def get_courses(db: Session = Depends(get_db)):
-    courses = db.query(Course).filter(Course.user_id == 1).order_by(Course.created_at).all()
+async def get_courses(db: Session = Depends(get_db),
+                      current_user: User = Depends(get_current_user)):
+    courses = db.query(Course).filter(Course.user_id == current_user.id).order_by(Course.created_at).all()
 
     result=[]
     for c in courses:
@@ -837,8 +972,10 @@ async def get_courses(db: Session = Depends(get_db)):
 
 
 @app.get("/courses/{course_id}")
-async def get_course(course_id: int, db: Session = Depends(get_db)):
-    course = db.query(Course).filter(Course.id==course_id).first()
+async def get_course(course_id: int, 
+                     db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user)):
+    course = db.query(Course).filter(Course.id==course_id,Course.user_id == current_user.id).first()
 
     if not course:
         raise HTTPException(status_code=404, detail="Course not found.")
@@ -862,8 +999,11 @@ async def get_course(course_id: int, db: Session = Depends(get_db)):
 
 
 @app.patch("/courses/{course_id}")
-async def update_course(course_id: int, request: CourseUpdateRequest, db: Session = Depends(get_db)):
-    course = db.query(Course).filter(Course.id==course_id).first()
+async def update_course(course_id: int, 
+                        request: CourseUpdateRequest, 
+                        db: Session = Depends(get_db),
+                        current_user: User = Depends(get_current_user)):
+    course = db.query(Course).filter(Course.id==course_id, Course.user_id==current_user.id).first()
 
     if not course:
         raise HTTPException(status_code=404, detail="Course not found.")
@@ -880,11 +1020,11 @@ async def update_course(course_id: int, request: CourseUpdateRequest, db: Sessio
 
 
 @app.delete("/courses/{course_id}")
-async def delete_course(course_id: int, db: Session = Depends(get_db)):
-    if course_id == 1:
-        raise HTTPException(status_code=400, detail="Default course cannot be deleted")
+async def delete_course(course_id: int, 
+                        db: Session = Depends(get_db),
+                        current_user: User = Depends(get_current_user)):
 
-    course = db.query(Course).filter(Course.id==course_id).first()
+    course = db.query(Course).filter(Course.id==course_id, Course.user_id==current_user.id).first()
 
     if not course:
         raise HTTPException(status_code=404, detail="Course not found.")

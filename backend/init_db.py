@@ -8,6 +8,7 @@
 from database import SessionLocal
 from models import User, Course
 from datetime import datetime, timezone
+from auth import hash_password
 
 def init_default_user():
     db = SessionLocal()
@@ -23,7 +24,7 @@ def init_default_user():
             id=1,
             email="default@eduprep.local",
             name="Default User",
-            password_hash="placeholder" 
+            password_hash=hash_password("placeholder") 
         )
         db.add(default_user)
         db.commit()
