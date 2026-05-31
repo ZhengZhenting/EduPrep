@@ -1,296 +1,567 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import AnswerRenderer from './AnswerRenderer'
 
-const API = 'http://localhost:8000'  // 对接后端API地址
+// ─── Global Style ─────────────────────────────────────────────────────────────
+function GlobalStyle() {
+  return (
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body {
+        margin: 0; padding: 0; min-height: 100vh;
+        font-family: 'DM Sans', system-ui, sans-serif;
+        background: linear-gradient(150deg, #f0f0f0 0%, #e8e8e8 50%, #e3e3e3 100%);
+        background-attachment: fixed;
+      }
+      body::after {
+        content: '';
+        position: fixed; inset: 0; pointer-events: none; z-index: 9998;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        opacity: 0.032;
+      }
+      ::-webkit-scrollbar { width: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+    `}</style>
+  )
+}
 
-function App() {
-  // upload相关状态
-  const [uploadStatus, setUploadStatus] = useState('')
-  const [filename, setFilename] = useState('')
-  // ask相关状态
-  const [question, setQuestion] = useState('')
-  const [answer, setAnswer] = useState('')
-  const [sources, setSources] = useState([])      // 页码来源
-  const [history, setHistory] = useState([])      // 对话历史
-  const [uploading, setUploading] = useState(false)
-  const [asking, setAsking] = useState(false)
-  // preview相关状态
-  const [previewData, setPreviewData] = useState(null)   // 存储preview返回的数据
-  const [previewing, setPreviewing] = useState(false)     // 是否正在加载
-  // quiz相关状态
-  const [quizQuestions, setQuizQuestions] = useState([])     // 所有题目
-  const [currentIndex, setCurrentIndex] = useState(0)        // 当前第几题（从0开始）
-  const [selectedOption, setSelectedOption] = useState(null)  // 用户选择了哪个选项
-  const [showResult, setShowResult] = useState(false)         // 是否显示对错结果
-  const [score, setScore] = useState(0)                       // 答对的题数
-  const [quizFinished, setQuizFinished] = useState(false)     // 是否做完所有题
-  const [loadingQuiz, setLoadingQuiz] = useState(false)       // 是否正在加载题目
-  // note相关状态
-  const [notes, setNotes] = useState([])
-  const [showNotes, setShowNotes] = useState(false)
+const API = 'http://localhost:8000'
 
-  // course相关状态
+const getToken = () => localStorage.getItem('edu_token')
+const saveToken = t => localStorage.setItem('edu_token', t)
+const removeToken = () => localStorage.removeItem('edu_token')
+
+const saveUserData = u => localStorage.setItem('edu_user', JSON.stringify(u))
+const getUserData = () => { try { return JSON.parse(localStorage.getItem('edu_user')) } catch { return null } }
+const removeUserData = () => localStorage.removeItem('edu_user')
+
+const authFetch = async (url, options = {}) => {
+  const token = getToken()
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    }
+  })
+  if (res.status === 401) {
+    removeToken()
+    window.location.reload()
+  }
+  return res
+}
+
+// ─── Auth Screen ──────────────────────────────────────────────────────────────
+function AuthScreen({ onLogin }) {
+  const [mode, setMode] = useState('login')
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      if (mode === 'login') {
+        const res = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        })
+        if (!res.ok) throw new Error((await res.json()).detail || 'Login failed')
+        const data = await res.json()
+        saveToken(data.access_token)
+        onLogin(data.user)
+      } else {
+        const res = await fetch(`${API}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, name, password })
+        })
+        if (!res.ok) throw new Error((await res.json()).detail || 'Registration failed')
+        const loginRes = await fetch(`${API}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        })
+        const data = await loginRes.json()
+        saveToken(data.access_token)
+        onLogin(data.user)
+      }
+    } catch (err) {
+      setError(err.message)
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div style={s.authBg}>
+      <div style={s.authCard}>
+        <div style={s.authLogo}>EduPrep</div>
+        <p style={s.authSubtitle}>
+          {mode === 'login' ? 'Sign in to your knowledge space' : 'Create your account'}
+        </p>
+        {mode === 'register' && (
+          <input style={s.authInput} placeholder="Full name" value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
+        )}
+        <input style={s.authInput} placeholder="Email" type="email" value={email}
+          onChange={e => setEmail(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
+        <input style={s.authInput} placeholder="Password" type="password" value={password}
+          onChange={e => setPassword(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
+        {error && <p style={s.authError}>{error}</p>}
+        <button style={loading ? s.authBtnDisabled : s.authBtn} onClick={handleSubmit} disabled={loading}>
+          {loading ? '...' : mode === 'login' ? 'Sign in' : 'Create account'}
+        </button>
+        <p style={s.authToggle}>
+          {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+          <span style={s.authToggleLink} onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError('') }}>
+            {mode === 'login' ? 'Register' : 'Sign in'}
+          </span>
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+function Sidebar({ user, selectedCourse, selectedPdf, onSelectCourse, onSelectPdf, onGoHome, onLogout, refreshKey }) {
   const [courses, setCourses] = useState([])
-  const [selectedCourseId, setSelectedCourseId] = useState(1)
-  const [coursesLoading, setCoursesLoading] = useState(false)
+  const [expandedId, setExpandedId] = useState(null)
+  const [pdfMap, setPdfMap] = useState({})
+  const [loadingPdfs, setLoadingPdfs] = useState({})
+  const expandedIdRef = useRef(null)
+
+  const setExpanded = (id) => {
+    expandedIdRef.current = id
+    setExpandedId(id)
+  }
 
   useEffect(() => {
     loadCourses()
-  }, [])
+    if (expandedIdRef.current) refreshPdfs(expandedIdRef.current)
+  }, [refreshKey])
 
-  // load, create, delete course
+  useEffect(() => {
+    if (selectedCourse?.id) {
+      setExpanded(selectedCourse.id)
+      refreshPdfs(selectedCourse.id)
+    }
+  }, [selectedCourse])
+
   const loadCourses = async () => {
-    setCoursesLoading(true)
     try {
-      const res = await fetch(`${API}/courses`)
+      const res = await authFetch(`${API}/courses`)
       const data = await res.json()
       setCourses(data.courses || [])
-    } catch (err) {
-      console.error('Failed to load courses:', err)
+    } catch (err) { console.error(err) }
+  }
+
+  const toggleCourse = async (course) => {
+    const isOpen = expandedId === course.id
+    setExpanded(isOpen ? null : course.id)
+    if (!isOpen) {
+      onSelectCourse(course)
+      setLoadingPdfs(prev => ({ ...prev, [course.id]: true }))
+      try {
+        const res = await authFetch(`${API}/courses/${course.id}`)
+        const data = await res.json()
+        setPdfMap(prev => ({ ...prev, [course.id]: data.pdf_files || [] }))
+      } catch (err) { console.error(err) }
+      setLoadingPdfs(prev => ({ ...prev, [course.id]: false }))
     }
-    setCoursesLoading(false)
+  }
+
+  const refreshPdfs = async (courseId) => {
+    try {
+      const res = await authFetch(`${API}/courses/${courseId}`)
+      const data = await res.json()
+      setPdfMap(prev => ({ ...prev, [courseId]: data.pdf_files || [] }))
+    } catch (err) { console.error(err) }
+  }
+
+  return (
+    <div style={s.sidebar}>
+      <div style={s.sidebarLogo} onClick={onGoHome}>EduPrep</div>
+
+      <nav style={s.sidebarNav}>
+        <p style={s.sidebarSection}>COURSES</p>
+        {courses.map(c => (
+          <div key={c.id}>
+            {/* Course row */}
+            <div
+              style={{ ...s.sidebarCourseRow, ...(selectedCourse?.id === c.id && expandedId === c.id ? s.sidebarCourseRowActive : {}) }}
+              onClick={() => toggleCourse(c)}
+            >
+              <span style={s.sidebarChevron}>{expandedId === c.id ? '▾' : '▸'}</span>
+              <span style={s.sidebarCourseName}>{c.title}</span>
+              <span style={s.sidebarPdfCount}>{c.pdf_count}</span>
+            </div>
+
+            {/* PDF sub-items */}
+            {expandedId === c.id && (
+              <div>
+                {loadingPdfs[c.id] && (
+                  <p style={s.sidebarPdfLoading}>Loading...</p>
+                )}
+                {(pdfMap[c.id] || []).map(pdf => (
+                  <div
+                    key={pdf.id}
+                    style={{ ...s.sidebarPdfItem, ...(selectedPdf === pdf.filename ? s.sidebarPdfItemActive : {}) }}
+                    onClick={() => onSelectPdf(c, pdf.filename)}
+                  >
+                    <span style={s.sidebarPdfDot}>·</span>
+                    <span style={s.sidebarPdfName}>{pdf.filename.replace('.pdf', '')}</span>
+                  </div>
+                ))}
+                {!loadingPdfs[c.id] && (pdfMap[c.id] || []).length === 0 && (
+                  <p style={s.sidebarPdfLoading}>No PDFs yet</p>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </nav>
+
+      <div style={s.sidebarFooter}>
+        <div style={s.sidebarUserRow}>
+          <span style={s.sidebarUserIcon}>◎</span>
+          <span style={s.sidebarUserName}>{user?.name || user?.email || 'User'}</span>
+        </div>
+        <button style={s.sidebarLogout} onClick={onLogout}>
+          <span style={s.sidebarLogoutIcon}>⏻</span>
+          Sign out
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Courses View ─────────────────────────────────────────────────────────────
+function CoursesView({ onSelectCourse }) {
+  const [courses, setCourses] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [newTitle, setNewTitle] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [hoveredId, setHoveredId] = useState(null)
+
+  useEffect(() => { loadCourses() }, [])
+
+  const loadCourses = async () => {
+    setLoading(true)
+    try {
+      const res = await authFetch(`${API}/courses`)
+      const data = await res.json()
+      setCourses(data.courses || [])
+    } catch (err) { console.error(err) }
+    setLoading(false)
   }
 
   const createCourse = async () => {
-    const title = prompt('Course name:')
-    if (!title || !title.trim()) return
-
+    if (!newTitle.trim()) return
+    setCreating(true)
     try {
-      const res = await fetch(`${API}/courses`, {
+      const res = await authFetch(`${API}/courses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim() })
+        body: JSON.stringify({ title: newTitle.trim() })
       })
       if (!res.ok) throw new Error('Create failed')
+      setNewTitle('')
+      setShowForm(false)
       await loadCourses()
-    } catch (err) {
-      alert(`Create course failed: ${err.message}`)
-    }
+    } catch (err) { alert(err.message) }
+    setCreating(false)
   }
 
-  const deleteCourse = async (courseId) => {
-    if (courseId === 1) {
-      alert('Default course cannot be deleted')
-      return
-    }
+  const deleteCourse = async (e, id) => {
+    e.stopPropagation()
     if (!confirm('Delete this course and all its PDFs?')) return
-
     try {
-      const res = await fetch(`${API}/courses/${courseId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Delete failed')
+      await authFetch(`${API}/courses/${id}`, { method: 'DELETE' })
       await loadCourses()
-
-      // 如果删的是当前选中的课程，切回默认课程
-      if (selectedCourseId === courseId) {
-        setSelectedCourseId(1)
-      }
-    } catch (err) {
-      alert(`Delete course failed: ${err.message}`)
-    }
+    } catch (err) { alert(err.message) }
   }
 
-  // 处理PDF上传Upload
-  const handleUpload = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
+  if (loading) return <p style={s.loadingText}>Loading...</p>
 
+  return (
+    <div>
+      <div style={s.pageHeader}>
+        <h1 style={s.pageTitle}>Your Courses</h1>
+        <button style={s.textBtn} onClick={() => setShowForm(!showForm)}>+ New Course</button>
+      </div>
+
+      {showForm && (
+        <div style={s.createForm}>
+          <input style={s.createInput} placeholder="Course title..." value={newTitle}
+            onChange={e => setNewTitle(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && createCourse()} autoFocus />
+          <button style={creating ? s.authBtnDisabled : s.actionBtn} onClick={createCourse} disabled={creating}>
+            {creating ? '...' : 'Create'}
+          </button>
+          <button style={s.cancelBtn} onClick={() => setShowForm(false)}>Cancel</button>
+        </div>
+      )}
+
+      {courses.length === 0 ? (
+        <div style={s.emptyState}>
+          <p style={s.emptyText}>No courses yet. Create your first course to begin.</p>
+        </div>
+      ) : (
+        <div style={s.courseGrid}>
+          {courses.map(c => (
+            <div key={c.id}
+              style={{ ...s.courseCard, ...(hoveredId === c.id ? s.courseCardHover : {}) }}
+              onClick={() => onSelectCourse(c)}
+              onMouseEnter={() => setHoveredId(c.id)}
+              onMouseLeave={() => setHoveredId(null)}>
+              <h2 style={s.courseCardTitle}>{c.title}</h2>
+              <p style={s.courseCardMeta}>{c.pdf_count} document{c.pdf_count !== 1 ? 's' : ''}</p>
+              <button style={s.cardDeleteBtn} onClick={e => deleteCourse(e, c.id)}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Course Detail ────────────────────────────────────────────────────────────
+function CourseDetailView({ course, onSelectPdf, onBack, onUploadDone }) {
+  const [pdfs, setPdfs] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState('')
+  const [dragging, setDragging] = useState(false)
+  const fileRef = useRef(null)
+
+  useEffect(() => { loadPdfs() }, [course.id])
+
+  const loadPdfs = async () => {
+    try {
+      const res = await authFetch(`${API}/courses/${course.id}`)
+      const data = await res.json()
+      setPdfs(data.pdf_files || [])
+    } catch (err) { console.error(err) }
+  }
+
+  const handleUpload = async (file) => {
+    if (!file || !file.name.endsWith('.pdf')) { alert('Please select a PDF file'); return }
     setUploading(true)
     setUploadStatus('Uploading...')
-
     const formData = new FormData()
     formData.append('file', file)
-    formData.append('course_id', selectedCourseId)   // ← 新增这行
-
+    formData.append('course_id', course.id)
     try {
-      const res = await fetch(`${API}/upload`, {
-        method: 'POST',
-        body: formData
-      })
+      const res = await authFetch(`${API}/upload`, { method: 'POST', body: formData })
       const data = await res.json()
-      setFilename(data.filename)
       setUploadStatus('Processing PDF...')
-      setHistory([])
-      pollUploadStatus(data.filename)
-
+      pollStatus(data.filename)
     } catch (err) {
       setUploadStatus(`Upload failed: ${err.message}`)
       setUploading(false)
     }
   }
 
-  const pollUploadStatus = (filename) => {
-    const interval = setInterval(async () => {
+  const pollStatus = (filename) => {
+    const iv = setInterval(async () => {
       try {
-        const res = await fetch(`${API}/upload/status/${encodeURIComponent(filename)}`)
+        const res = await authFetch(`${API}/upload/status/${encodeURIComponent(filename)}`)
         const data = await res.json()
-
         if (data.status === 'done') {
-          clearInterval(interval)
-          setUploadStatus(`✅ ${filename} ready — ${data.chunks} chunks`)
+          clearInterval(iv)
+          setUploadStatus(`Ready — ${data.chunks} chunks processed`)
           setUploading(false)
-
-          // 加载该 PDF 的历史对话
-          await loadMessages(filename)
-          await loadNotes(filename)
-
+          await loadPdfs()
+          if (onUploadDone) onUploadDone()
         } else if (data.status === 'error') {
-          clearInterval(interval)
-          setUploadStatus(`Processing failed: ${data.message}`)
+          clearInterval(iv)
+          setUploadStatus(`Error: ${data.message}`)
           setUploading(false)
         } else {
-          setUploadStatus(`Processing PDF... ${data.progress}%`)
+          setUploadStatus(`Processing... ${data.progress}%`)
         }
-      } catch (err) {
-        clearInterval(interval)
-        setUploadStatus(`Error checking status: ${err.message}`)
-        setUploading(false)
-      }
+      } catch { clearInterval(iv); setUploading(false) }
     }, 2000)
   }
 
-  // Note operations: load, save and delete
-  const loadNotes = async (filename) => {
+  return (
+    <div>
+      <button style={s.backBtn} onClick={onBack}>← Courses</button>
+      <h1 style={s.pageTitle}>{course.title}</h1>
+
+      <div
+        style={{ ...s.uploadZone, ...(dragging ? s.uploadZoneDrag : {}) }}
+        onDragOver={e => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={e => { e.preventDefault(); setDragging(false); handleUpload(e.dataTransfer.files[0]) }}
+        onClick={() => !uploading && fileRef.current?.click()}>
+        <input ref={fileRef} type="file" accept=".pdf" style={{ display: 'none' }}
+          onChange={e => e.target.files[0] && handleUpload(e.target.files[0])} />
+        {uploading ? (
+          <>
+            <p style={s.uploadLabel}>{uploadStatus}</p>
+            <div style={s.progressBg}><div style={{ ...s.progressFill, width: '60%' }} /></div>
+          </>
+        ) : (
+          <>
+            <div style={s.uploadIcon}>↑</div>
+            <p style={s.uploadLabel}>Drop a PDF here or click to upload</p>
+            {uploadStatus && <p style={s.uploadStatusText}>{uploadStatus}</p>}
+          </>
+        )}
+      </div>
+
+      {pdfs.length > 0 && (
+        <>
+          <h2 style={s.sectionTitle}>Documents</h2>
+          <div style={s.pdfList}>
+            {pdfs.map(pdf => (
+              <div key={pdf.id} style={s.pdfItem}>
+                <div style={s.pdfIcon} onClick={() => onSelectPdf(pdf.filename)}>PDF</div>
+                <div style={s.pdfInfo} onClick={() => onSelectPdf(pdf.filename)}>
+                  <p style={s.pdfName}>{pdf.filename}</p>
+                  <p style={s.pdfMeta}>{pdf.chunk_count} chunks · {new Date(pdf.created_at).toLocaleDateString()}</p>
+                </div>
+                <button style={s.pdfDeleteBtn} onClick={async (e) => {
+                  e.stopPropagation()
+                  if (!confirm(`Delete "${pdf.filename}"? This cannot be undone.`)) return
+                  try {
+                    const res = await authFetch(`${API}/pdfs/${pdf.id}`, { method: 'DELETE' })
+                    if (!res.ok) throw new Error((await res.json()).detail)
+                    await loadPdfs()
+                  } catch (err) { alert(err.message) }
+                }}>×</button>
+                <span style={s.pdfArrow} onClick={() => onSelectPdf(pdf.filename)}>→</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── Learn View ───────────────────────────────────────────────────────────────
+function LearnView({ filename, courseId, onBack }) {
+  const [mode, setMode] = useState(null)
+
+  // Preview
+  const [previewData, setPreviewData] = useState(null)
+  const [previewing, setPreviewing] = useState(false)
+
+  // Learn
+  const [question, setQuestion] = useState('')
+  const [history, setHistory] = useState([])
+  const [asking, setAsking] = useState(false)
+
+  // Quiz
+  const [quizQuestions, setQuizQuestions] = useState([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [selectedOption, setSelectedOption] = useState(null)
+  const [showResult, setShowResult] = useState(false)
+  const [score, setScore] = useState(0)
+  const [quizFinished, setQuizFinished] = useState(false)
+  const [loadingQuiz, setLoadingQuiz] = useState(false)
+
+  // Notes
+  const [notes, setNotes] = useState([])
+  const [showNotes, setShowNotes] = useState(false)
+
+  useEffect(() => {
+    loadMessages()
+    loadNotes()
+  }, [filename])
+
+  const loadMessages = async () => {
     try {
-      const res = await fetch(`${API}/notes/${encodeURIComponent(filename)}?course_id=${selectedCourseId}`)
+      const res = await authFetch(`${API}/message/${encodeURIComponent(filename)}?course_id=${courseId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.messages?.length > 0) setHistory(data.messages)
+    } catch (err) { console.error(err) }
+  }
+
+  const loadNotes = async () => {
+    try {
+      const res = await authFetch(`${API}/notes/${encodeURIComponent(filename)}?course_id=${courseId}`)
       if (!res.ok) return
       const data = await res.json()
       setNotes(data.notes || [])
-    } catch (err) {
-      console.error('Failed to load notes:', err)
-    }
+    } catch (err) { console.error(err) }
   }
 
   const saveNote = async (type, content) => {
     try {
-      const res = await fetch(`${API}/notes`, {
+      const res = await authFetch(`${API}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: filename,
-          type: type,
-          content: content,
-          course_id: selectedCourseId
-        })
+        body: JSON.stringify({ filename, type, content, course_id: courseId })
       })
       if (!res.ok) throw new Error('Save failed')
-      const newNote = await res.json()
-      setNotes(prev => [newNote, ...prev])
-    } catch (err) {
-      alert(`Save note failed: ${err.message}`)
-    }
+      const note = await res.json()
+      setNotes(prev => [note, ...prev])
+    } catch (err) { alert(err.message) }
   }
 
-  const deleteNote = async (noteId) => {
+  const deleteNote = async (id) => {
     try {
-      await fetch(`${API}/notes/${noteId}`, { method: 'DELETE' })
-      setNotes(prev => prev.filter(n => n.id !== noteId))
-    } catch (err) {
-      console.error('Failed to delete note:', err)
-    }
+      await authFetch(`${API}/notes/${id}`, { method: 'DELETE' })
+      setNotes(prev => prev.filter(n => n.id !== id))
+    } catch (err) { console.error(err) }
   }
 
-  // 加载历史消息 messages接口
-  const loadMessages = async (filename) => {
-    try {
-      const res = await fetch(`${API}/messages/${encodeURIComponent(filename)}?course_id=${selectedCourseId}`)
-      if (!res.ok) return
-
-      const data = await res.json()
-      if (data.messages && data.messages.length > 0) {
-        setHistory(data.messages)
-        console.log(`Loaded ${data.messages.length} historical messages`)
-      }
-    } catch (err) {
-      console.error('Failed to load messages:', err)
-    }
-  }
-
-  // 处理提问Ask
-  const handleAsk = async () => {
-    if (!question.trim() || !filename || asking) return
-
-    const currentQuestion = question
-    setQuestion('')
-    setAsking(true)
-    setAnswer('')
-    setSources([])
-
-    const newHistory = [...history, { role: 'user', content: currentQuestion }]
-
-    try {
-      const response = await fetch(`${API}/ask`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          history: history,
-          question: currentQuestion,
-          filename: filename,
-          course_id: selectedCourseId
-        })
-      })
-
-      const data = await response.json()
-
-      setAnswer(data.answer)
-      setSources(data.sources)
-
-      setHistory([
-        ...newHistory,
-        { role: 'assistant', content: data.answer, sources: data.sources }
-      ])
-
-    } catch (err) {
-      setAnswer(`Error: ${err.message}`)
-    }
-
-    setAsking(false)
-  }
-
-
-  // 处理Preview生成
   const handlePreview = async () => {
-    if (!filename || previewing) return
-
+    if (previewing) return
     setPreviewing(true)
     setPreviewData(null)
-
     try {
-      const response = await fetch(`${API}/preview`, {
+      const res = await authFetch(`${API}/preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: filename, course_id: selectedCourseId })
+        body: JSON.stringify({ filename, course_id: courseId })
       })
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.detail || 'Failed to generate preview')
-      }
-
-      const data = await response.json()
-      setPreviewData(data)
-    } catch (err) {
-      alert(`Preview Error: ${err.message}`)
-    }
+      if (!res.ok) throw new Error((await res.json()).detail)
+      setPreviewData(await res.json())
+    } catch (err) { alert(err.message) }
     setPreviewing(false)
   }
 
-  //处理回车键提问
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !asking) {
-      handleAsk()
+  const handleAsk = async () => {
+    if (!question.trim() || asking) return
+    const q = question
+    setQuestion('')
+    setAsking(true)
+    const newHistory = [...history, { role: 'user', content: q }]
+    setHistory(newHistory)
+    try {
+      const res = await authFetch(`${API}/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q, filename, course_id: courseId, history })
+      })
+      const data = await res.json()
+      setHistory([...newHistory, {
+        role: 'assistant',
+        content: data.answer,
+        sources: data.sources,
+        source_type: data.source_type
+      }])
+    } catch (err) {
+      setHistory([...newHistory, { role: 'assistant', content: `Error: ${err.message}` }])
     }
+    setAsking(false)
   }
 
-  // 清空对话
-  const handleClear = () => {
-    setHistory([])
-    setAnswer('')
-    setSources([])
-  }
-
-  // 生成Quiz题目
   const handleStartQuiz = async () => {
-    if (!filename || loadingQuiz || uploading) return
-
+    if (loadingQuiz) return
     setLoadingQuiz(true)
     setQuizQuestions([])
     setCurrentIndex(0)
@@ -298,68 +569,36 @@ function App() {
     setShowResult(false)
     setScore(0)
     setQuizFinished(false)
-
     try {
-      const response = await fetch(`${API}/quiz`, {
+      const res = await authFetch(`${API}/quiz`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: filename, course_id: selectedCourseId, num_questions: 5 })
+        body: JSON.stringify({ filename, course_id: courseId, num_questions: 5 })
       })
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.detail || 'Failed to generate quiz')
-      }
-
-      const data = await response.json()
+      if (!res.ok) throw new Error((await res.json()).detail)
+      const data = await res.json()
       setQuizQuestions(data.questions)
-    } catch (err) {
-      alert(`Quiz Error: ${err.message}`)
-    }
-
+    } catch (err) { alert(err.message) }
     setLoadingQuiz(false)
   }
 
   const handleSelectOption = (option) => {
-    if (showResult) return //如果已经显示结果了，就不允许再选了
-
+    if (showResult) return
     setSelectedOption(option)
     setShowResult(true)
-
-    const currentQuestion = quizQuestions[currentIndex]
-    if (option === currentQuestion.answer) {
-      setScore(prev => prev + 1)
-    }
+    if (option === quizQuestions[currentIndex].answer) setScore(prev => prev + 1)
   }
 
   const handleNextQuestion = async () => {
     if (currentIndex + 1 >= quizQuestions.length) {
       setQuizFinished(true)
-
-      // save to database
       try {
-        await fetch(`${API}/quiz/result`, {
+        await authFetch(`${API}/quiz/result`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            filename: filename,
-            course_id: selectedCourseId,
-            score: score,
-            total: quizQuestions.length
-          })
+          body: JSON.stringify({ filename, course_id: courseId, score, total: quizQuestions.length })
         })
-      } catch (err) {
-        console.error('Failed to save quiz result:', err)
-      }
-
-      // save to localStorage
-      const progressKey = `quiz_progress_${filename}`
-      const progressData = {
-        filename: filename,
-        score: score,
-        total: quizQuestions.length,
-        date: new Date().toLocaleDateString()
-      }
-      localStorage.setItem(progressKey, JSON.stringify(progressData))
+      } catch (err) { console.error(err) }
     } else {
       setCurrentIndex(prev => prev + 1)
       setSelectedOption(null)
@@ -367,680 +606,434 @@ function App() {
     }
   }
 
-  const handleRestartQuiz = () => {
-    setCurrentIndex(0)
-    setSelectedOption(null)
-    setShowResult(false)
-    setScore(0)
-    setQuizFinished(false)
-    setQuizQuestions([])
+  const selectMode = (m) => {
+    setMode(m)
+    if (m === 'preview' && !previewData && !previewing) handlePreview()
   }
 
+  const modes = [
+    { id: 'preview', label: 'Preview', desc: 'Summary & vocabulary' },
+    { id: 'learn', label: 'Learn', desc: 'Ask questions' },
+    { id: 'quiz', label: 'Quiz', desc: 'Test your knowledge' }
+  ]
 
-
-
-  // HTML
   return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>EduPrep</h1>
+    <div>
+      <button style={s.backBtn} onClick={onBack}>← Back</button>
+      <h1 style={{ ...s.pageTitle, marginBottom: 8 }}>{filename}</h1>
 
-      {/* 课程选择栏 */}
-      <div style={styles.courseBar}>
-        <span style={{ fontSize: 14, color: '#374151', marginRight: 8 }}>Course:</span>
-        <select
-          value={selectedCourseId}
-          onChange={(e) => setSelectedCourseId(Number(e.target.value))}
-          style={styles.courseSelect}
-        >
-          {courses.map(c => (
-            <option key={c.id} value={c.id}>
-              {c.title} ({c.pdf_count} PDFs)
-            </option>
-          ))}
-        </select>
-        <button onClick={createCourse} style={styles.btnSmall}>+ New</button>
-        {selectedCourseId !== 1 && (
-          <button onClick={() => deleteCourse(selectedCourseId)} style={styles.btnSmallDanger}>
-            Delete
-          </button>
-        )}
+      <div style={s.notesBar}>
+        <button style={s.notesToggle} onClick={() => setShowNotes(!showNotes)}>
+          {showNotes ? 'Hide Notes' : `Notes (${notes.length})`}
+        </button>
       </div>
-
-      <button
-        onClick={() => setShowNotes(prev => !prev)}
-        style={styles.btn}
-        disabled={!filename}
-      >
-        {showNotes ? 'Hide Notes' : `Notes (${notes.length})`}
-      </button>
 
       {showNotes && (
-        <div style={styles.card}>
-          <h2 style={styles.cardTitle}>Notes</h2>
-          {notes.length === 0 ? (
-            <p style={{ color: '#9ca3af', fontSize: 13 }}>No notes saved yet.</p>
-          ) : (
-            notes.map(note => (
-              <div key={note.id} style={styles.noteItem}>
-                <div style={styles.noteHeader}>
-                  <span style={styles.noteType}>{note.type}</span>
-                  <span style={styles.noteDate}>
-                    {new Date(note.created_at).toLocaleDateString()}
-                  </span>
-                  <button
-                    onClick={() => deleteNote(note.id)}
-                    style={styles.deleteNoteBtn}
-                  >
-                    🗑️
-                  </button>
+        <div style={s.notesPanel}>
+          {notes.length === 0
+            ? <p style={s.emptyText}>No notes saved yet.</p>
+            : notes.map(note => (
+              <div key={note.id} style={s.noteItem}>
+                <div style={s.noteHeader}>
+                  <span style={s.noteType}>{note.type}</span>
+                  <span style={s.noteMeta}>{new Date(note.created_at).toLocaleDateString()}</span>
+                  <button style={s.noteDelete} onClick={() => deleteNote(note.id)}>×</button>
                 </div>
-                <div style={styles.noteContent}>
-                  <AnswerRenderer text={note.content} />
-                </div>
+                <div style={s.noteContent}><AnswerRenderer text={note.content} /></div>
               </div>
             ))
-          )}
+          }
         </div>
       )}
 
-      {/* 上传区域 */}
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Upload PDF</h2>
-        <input type="file" accept=".pdf" onChange={handleUpload} disabled={uploading} />
-        {uploadStatus && <p style={styles.status}>{uploadStatus}</p>}
+      {/* Mode selector */}
+      <div style={s.modeGrid}>
+        {modes.map(m => (
+          <div key={m.id}
+            style={{ ...s.modeCard, ...(mode === m.id ? s.modeCardActive : {}) }}
+            onClick={() => selectMode(m.id)}>
+            <h3 style={{ ...s.modeTitle, ...(mode === m.id ? { color: 'rgba(255,255,255,0.92)' } : {}) }}>{m.label}</h3>
+            <p style={{ ...s.modeDesc, ...(mode === m.id ? { color: 'rgba(255,255,255,0.38)' } : {}) }}>{m.desc}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Preview 触发按钮 */}
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Preview Mode</h2>
-        <p style={{ fontSize: 14, color: '#666', marginBottom: 12, marginTop: 0 }}>
-          Automatically generate lecture notes summary and key vocabulary list
-        </p>
-        <button
-          onClick={handlePreview}
-          disabled={!filename || previewing || uploading}
-          style={!filename || previewing || uploading ? styles.btnDisabled : styles.btn}
-        >
-          {previewing ? 'Generating, please wait...' : 'Generate Preview'}
-        </button>
-      </div>
-
-      {/* Preview 结果 */}
-      {previewData && (
-        <div style={styles.card}>
-
-          {/* 双语摘要 */}
-          <h2 style={styles.cardTitle}>Summary</h2>
-
-          <div style={styles.summaryBox}>
-            <p style={styles.summaryLabel}>🇩🇪 Deutsch</p>
-            <p style={styles.summaryText}>{previewData.summary_de}</p>
-          </div>
-
-          <div style={{ ...styles.summaryBox, background: '#f0f9ff' }}>
-            <p style={styles.summaryLabel}>🇨🇳 中文</p>
-            <p style={styles.summaryText}>{previewData.summary_zh}</p>
-          </div>
-
-          {/* 词汇列表 */}
-          <h2 style={{ ...styles.cardTitle, marginTop: 24 }}>Key Words</h2>
-
-          {/* Mindmap */}
-          {previewData.mindmap && (
-            <div style={styles.card}>
-              <h2 style={styles.cardTitle}>Lecture Structure</h2>
-              <AnswerRenderer text={previewData.mindmap} />
-            </div>
-          )}
-
-          <div style={styles.vocabList}>
-            {previewData.vocabulary.map((item, index) => (
-              <div key={index} style={styles.vocabCard}>
-                {typeof item === 'string' ? item : item.term}
+      {/* Preview content */}
+      {mode === 'preview' && (
+        <div style={s.contentArea}>
+          {previewing && <p style={s.loadingText}>Generating preview...</p>}
+          {previewData && (
+            <>
+              <div style={s.summaryBlock}>
+                <p style={s.summaryLang}>Deutsch</p>
+                <p style={s.summaryText}>{previewData.summary_de}</p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 对话历史 */}
-      {history.length > 0 && (
-        <div style={styles.card}>
-          <div style={styles.historyHeader}>
-            <h2 style={styles.cardTitle}>Dialogue</h2>
-            <button onClick={handleClear} style={styles.clearBtn}>Clear</button>
-          </div>
-          {history.map((msg, i) => (
-            <div key={i} style={msg.role === 'user' ? styles.userMsg : styles.aiMsg}>
-              <strong>{msg.role === 'user' ? 'You' : 'AI'}：</strong>
-              {msg.role === 'user'
-                ? msg.content
-                : <AnswerRenderer text={msg.content} />
-              }
-              {msg.role === 'assistant' && msg.sources && msg.sources.length > 0 && (
-                <div style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>
-                  Sources from Page： {msg.sources.join('、')}
+              <div style={{ ...s.summaryBlock, background: '#f0f9ff' }}>
+                <p style={s.summaryLang}>中文</p>
+                <p style={s.summaryText}>{previewData.summary_zh}</p>
+              </div>
+              {previewData.mindmap && (
+                <div style={{ marginTop: 24 }}>
+                  <p style={s.contentLabel}>Lecture Structure</p>
+                  <AnswerRenderer text={previewData.mindmap} />
                 </div>
               )}
-              {/* 保存笔记按钮 */}
-              {msg.role === 'assistant' && (
-                <button
-                  onClick={() => saveNote('answer', msg.content)}
-                  style={styles.saveNoteBtn}
-                >
-                  Save as Note
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* 当前回答 */}
-      {(answer || asking) && (
-        <div style={styles.card}>
-          <h2 style={styles.cardTitle}>
-            AI Answer
-            {asking && <span style={{ color: '#9ca3af' }}> Thinking...</span>}
-          </h2>
-          {sources.length > 0 && (
-            <p style={styles.sources}>
-              Sources from Page： {sources.join('、')}
-            </p>
-          )}
-          <AnswerRenderer text={answer} />
-        </div>
-      )}
-
-      {msg.source_type === 'pdf' && msg.sources?.length > 0 && (
-        <div style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>
-          Sources from Page：{msg.sources.join('、')}
-        </div>
-      )}
-      {msg.source_type === 'pdf+web' && (
-        <div style={{ fontSize: 12, color: '#7c3aed', marginTop: 4 }}>
-          PDF + Web
-        </div>
-      )}
-      {msg.source_type === 'web' && (
-        <div style={{ fontSize: 12, color: '#059669', marginTop: 4 }}>
-          Web Search
-        </div>
-      )}
-
-      {/* 输入框 */}
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Ask a Question</h2>
-        <input
-          value={question}
-          onChange={e => setQuestion(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={filename ? 'Enter your question, then press Enter...' : 'Please upload a PDF first'}
-          disabled={asking || !filename || uploading}
-          placeholder={uploading ? 'Please wait, processing PDF...' : filename ? 'Enter your question...' : 'Please upload a PDF first'}
-          style={styles.input}
-        />
-        <button
-          onClick={handleAsk}
-          disabled={asking || !filename || uploading}
-          style={asking || !filename || uploading ? styles.btnDisabled : styles.btn}
-        >
-          {asking ? 'Answering...' : 'Ask'}
-        </button>
-      </div>
-      {/* Review 模式 */}
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Review Mode</h2>
-        <p style={{ fontSize: 14, color: '#666', marginBottom: 12, marginTop: 0 }}>
-          Generate a quiz based on the lecture content
-        </p>
-        <button
-          onClick={handleStartQuiz}
-          disabled={!filename || loadingQuiz || uploading}
-          style={!filename || loadingQuiz || uploading ? styles.btnDisabled : styles.btn}
-        >
-          {loadingQuiz ? 'Generating questions...' : 'Start Quiz'}
-        </button>
-      </div>
-
-      {/* Quiz 答题区域 */}
-      {
-        quizQuestions.length > 0 && !quizFinished && (
-          <div style={styles.card}>
-
-            {/* 进度显示 */}
-            <div style={styles.quizProgress}>
-              <span style={styles.quizProgressText}>
-                Question {currentIndex + 1} of {quizQuestions.length}
-              </span>
-              <span style={styles.quizScore}>
-                Current Score: {score} / {currentIndex}
-              </span>
-            </div>
-
-            {/* 进度条 */}
-            <div style={styles.progressBarBg}>
-              <div style={{
-                ...styles.progressBarFill,
-                width: `${(currentIndex / quizQuestions.length) * 100}%`
-              }} />
-            </div>
-
-            {/* 题目 */}
-            <p style={styles.quizQuestion}>
-              {quizQuestions[currentIndex].question}
-            </p>
-
-            {/* 选项 */}
-            <div style={styles.optionsList}>
-              {Object.entries(quizQuestions[currentIndex].options).map(([key, value]) => {
-
-                // 根据答题状态决定每个选项的颜色
-                let optionStyle = styles.optionBtn
-                if (showResult) {
-                  if (key === quizQuestions[currentIndex].answer) {
-                    optionStyle = styles.optionCorrect   // 正确答案显示绿色
-                  } else if (key === selectedOption) {
-                    optionStyle = styles.optionWrong     // 选错了显示红色
-                  }
-                } else if (key === selectedOption) {
-                  optionStyle = styles.optionSelected      // 选中但还没判断
-                }
-
-                return (
-                  <button
-                    key={key}
-                    onClick={() => handleSelectOption(key)}
-                    disabled={showResult}
-                    style={optionStyle}
-                  >
-                    <strong>{key}.</strong> {value}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* 解析（选完才显示） */}
-            {showResult && (
-              <div style={styles.explanation}>
-                <strong>
-                  {selectedOption === quizQuestions[currentIndex].answer
-                    ? 'Answer is correct!'
-                    : `Answer is wrong, the correct answer is ${quizQuestions[currentIndex].answer}`
-                  }
-                </strong>
-                <p style={{ margin: '8px 0 0 0', fontSize: 14 }}>
-                  {quizQuestions[currentIndex].explanation}
-                </p>
+              <div style={{ marginTop: 24 }}>
+                <p style={s.contentLabel}>Key Vocabulary</p>
+                <div style={s.vocabGrid}>
+                  {previewData.vocabulary.map((item, i) => (
+                    <div key={i} style={s.vocabItem}>{typeof item === 'string' ? item : item}</div>
+                  ))}
+                </div>
               </div>
-            )}
-
-            {/* 下一题按钮 */}
-            {showResult && (
-              <button onClick={handleNextQuestion} style={{ ...styles.btn, marginTop: 16 }}>
-                {currentIndex + 1 >= quizQuestions.length ? 'View Results' : 'Next Question →'}
+              <button style={s.saveNoteBtn} onClick={() => saveNote('summary', previewData.summary_zh)}>
+                Save summary as note
               </button>
-            )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Learn content */}
+      {mode === 'learn' && (
+        <div style={s.contentArea}>
+          <div style={s.chatHistory}>
+            {history.length === 0 && <p style={s.emptyText}>Ask anything about this document.</p>}
+            {history.map((msg, i) => (
+              <div key={i} style={msg.role === 'user' ? s.userBubble : s.aiBubble}>
+                <p style={s.bubbleLabel}>{msg.role === 'user' ? 'You' : 'AI'}</p>
+                {msg.role === 'user'
+                  ? <p style={s.bubbleText}>{msg.content}</p>
+                  : <AnswerRenderer text={msg.content} />
+                }
+                {msg.role === 'assistant' && msg.source_type === 'pdf' && msg.sources?.pages?.length > 0 && (
+                  <p style={s.sourceTag}>Pages: {msg.sources.pages.join(', ')}</p>
+                )}
+                {msg.role === 'assistant' && msg.source_type === 'pdf+web' && (
+                  <p style={{ ...s.sourceTag, color: '#7c3aed' }}>PDF + Web</p>
+                )}
+                {msg.role === 'assistant' && (
+                  <button style={s.inlineNoteBtn} onClick={() => saveNote('answer', msg.content)}>
+                    Save as note
+                  </button>
+                )}
+              </div>
+            ))}
+            {asking && <p style={s.loadingText}>Thinking...</p>}
           </div>
-        )
-      }
-
-      {/* Quiz 完成结果页 */}
-      {
-        quizFinished && (
-          <div style={styles.card}>
-            <h2 style={styles.cardTitle}>🎉 Quiz Completed!</h2>
-
-            {/* 得分 */}
-            <div style={styles.scoreDisplay}>
-              <span style={styles.scoreBig}>{score}</span>
-              <span style={styles.scoreTotal}> / {quizQuestions.length}</span>
-            </div>
-
-            {/* 掌握百分比 */}
-            <p style={{ textAlign: 'center', fontSize: 15, color: '#555', marginBottom: 16 }}>
-              Mastery Level: {Math.round((score / quizQuestions.length) * 100)}%
-            </p>
-
-            {/* 掌握程度进度条 */}
-            <div style={styles.progressBarBg}>
-              <div style={{
-                ...styles.progressBarFill,
-                width: `${(score / quizQuestions.length) * 100}%`,
-                background: score / quizQuestions.length >= 0.8 ? '#16a34a' : '#2563eb'
-              }} />
-            </div>
-
-            {/* 评价文字 */}
-            <p style={{ textAlign: 'center', fontSize: 14, color: '#666', margin: '16px 0' }}>
-              {score / quizQuestions.length >= 0.8
-                ? '🌟 Great job!'
-                : score / quizQuestions.length >= 0.6
-                  ? 'Keep studying to improve'
-                  : 'Consider reviewing this material'
-              }
-            </p>
-
-            <button onClick={handleRestartQuiz} style={styles.btn}>
-              Try Again
+          <div style={s.chatInputRow}>
+            <input style={s.chatInput} value={question}
+              onChange={e => setQuestion(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !asking && handleAsk()}
+              placeholder="Ask a question about this document..."
+              disabled={asking} />
+            <button style={asking ? s.chatBtnDisabled : s.chatBtn} onClick={handleAsk} disabled={asking}>
+              Ask
             </button>
           </div>
-        )
-      }
-    </div>
+          {history.length > 0 && (
+            <button style={s.clearBtn} onClick={() => setHistory([])}>Clear conversation</button>
+          )}
+        </div>
+      )}
 
+      {/* Quiz content */}
+      {mode === 'quiz' && (
+        <div style={s.contentArea}>
+          {loadingQuiz && <p style={s.loadingText}>Generating questions...</p>}
+
+          {!loadingQuiz && quizQuestions.length === 0 && !quizFinished && (
+            <button style={s.actionBtn} onClick={handleStartQuiz}>Generate Quiz</button>
+          )}
+
+          {quizQuestions.length > 0 && !quizFinished && (
+            <>
+              <div style={s.quizMeta}>
+                <span style={s.quizMetaText}>Question {currentIndex + 1} of {quizQuestions.length}</span>
+                <span style={s.quizScoreText}>Score: {score}/{currentIndex}</span>
+              </div>
+              <div style={s.progressBg}>
+                <div style={{ ...s.progressFill, width: `${(currentIndex / quizQuestions.length) * 100}%` }} />
+              </div>
+              <p style={s.quizQuestion}>{quizQuestions[currentIndex].question}</p>
+              <div style={s.optionsList}>
+                {Object.entries(quizQuestions[currentIndex].options).map(([key, val]) => {
+                  let optStyle = s.optionBtn
+                  if (showResult) {
+                    if (key === quizQuestions[currentIndex].answer) optStyle = s.optionCorrect
+                    else if (key === selectedOption) optStyle = s.optionWrong
+                  } else if (key === selectedOption) {
+                    optStyle = s.optionSelected
+                  }
+                  return (
+                    <button key={key} style={optStyle} onClick={() => handleSelectOption(key)} disabled={showResult}>
+                      <strong>{key}.</strong> {val}
+                    </button>
+                  )
+                })}
+              </div>
+              {showResult && (
+                <div style={s.explanation}>
+                  <strong>
+                    {selectedOption === quizQuestions[currentIndex].answer
+                      ? 'Correct!'
+                      : `Wrong — correct answer: ${quizQuestions[currentIndex].answer}`}
+                  </strong>
+                  <p style={{ marginTop: 8, fontSize: 14 }}>{quizQuestions[currentIndex].explanation}</p>
+                </div>
+              )}
+              {showResult && (
+                <button style={{ ...s.actionBtn, marginTop: 20 }} onClick={handleNextQuestion}>
+                  {currentIndex + 1 >= quizQuestions.length ? 'View Results' : 'Next →'}
+                </button>
+              )}
+            </>
+          )}
+
+          {quizFinished && (
+            <div style={s.scoreCard}>
+              <div style={s.scoreBig}>{score}<span style={s.scoreTotal}>/{quizQuestions.length}</span></div>
+              <p style={s.scorePct}>{Math.round((score / quizQuestions.length) * 100)}% mastery</p>
+              <div style={s.progressBg}>
+                <div style={{
+                  ...s.progressFill,
+                  width: `${(score / quizQuestions.length) * 100}%`,
+                  background: score / quizQuestions.length >= 0.8 ? '#16a34a' : '#6366f1'
+                }} />
+              </div>
+              <button style={{ ...s.actionBtn, marginTop: 32 }} onClick={handleStartQuiz}>Try Again</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
+// ─── Root App ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const [token, setToken] = useState(getToken())
+  const [user, setUser] = useState(getUserData())
+  const [view, setView] = useState('courses')
+  const [selectedCourse, setSelectedCourse] = useState(null)
+  const [selectedPdf, setSelectedPdf] = useState(null)
+  const [sidebarRefresh, setSidebarRefresh] = useState(0)
 
-
-
-const styles = {
-  container: {
-    maxWidth: 720,
-    margin: '0 auto',
-    padding: '40px 20px',
-    fontFamily: 'sans-serif',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 24,
-  },
-  card: {
-    border: '1px solid #e0e0e0',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    background: '#fff',
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 600,
-    marginBottom: 12,
-    marginTop: 0,
-  },
-  status: {
-    marginTop: 10,
-    fontSize: 14,
-    color: '#444',
-  },
-  summaryBox: {
-    background: '#f9f9f9',
-    borderRadius: 8,
-    padding: '12px 16px',
-    marginBottom: 12,
-  },
-  summaryLabel: {
-    fontSize: 12,
-    fontWeight: 600,
-    color: '#888',
-    marginBottom: 6,
-    marginTop: 0,
-  },
-  summaryText: {
-    fontSize: 14,
-    lineHeight: 1.7,
-    color: '#333',
-    margin: 0,
-  },
-  vocabList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 12,
-  },
-  vocabCard: {
-    border: '1px solid #e0e0e0',
-    borderRadius: 10,
-    padding: '10px 16px',
-    background: '#fafafa',
-    fontSize: 14,
-    fontWeight: 600,
-    color: '#1a1a1a',
-  },
-  historyHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  clearBtn: {
-    fontSize: 12,
-    padding: '4px 10px',
-    cursor: 'pointer',
-    border: '1px solid #ccc',
-    borderRadius: 6,
-    background: '#fff',
-  },
-  userMsg: {
-    background: '#f0f4ff',
-    borderRadius: 8,
-    padding: '8px 12px',
-    marginBottom: 8,
-    fontSize: 14,
-  },
-  aiMsg: {
-    background: '#f5f5f5',
-    borderRadius: 8,
-    padding: '8px 12px',
-    marginBottom: 8,
-    fontSize: 14,
-  },
-  sources: {
-    fontSize: 13,
-    color: '#2563eb',
-    marginBottom: 8,
-  },
-  answerText: {
-    fontSize: 15,
-    lineHeight: 1.7,
-    whiteSpace: 'pre-wrap',
-  },
-  input: {
-    width: '100%',
-    padding: '10px 14px',
-    fontSize: 15,
-    border: '1px solid #ccc',
-    borderRadius: 8,
-    marginBottom: 10,
-    boxSizing: 'border-box',
-  },
-  btn: {
-    padding: '10px 24px',
-    fontSize: 15,
-    background: '#2563eb',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 8,
-    cursor: 'pointer',
-  },
-  btnDisabled: {
-    padding: '10px 24px',
-    fontSize: 15,
-    background: '#9ca3af',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 8,
-    cursor: 'not-allowed',
-  },
-  quizProgress: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  quizProgressText: {
-    fontSize: 13,
-    color: '#666',
-  },
-  quizScore: {
-    fontSize: 13,
-    color: '#2563eb',
-    fontWeight: 600,
-  },
-  progressBarBg: {
-    background: '#e5e7eb',
-    borderRadius: 99,
-    height: 8,
-    marginBottom: 20,
-  },
-  progressBarFill: {
-    background: '#2563eb',
-    borderRadius: 99,
-    height: 8,
-    transition: 'width 0.3s ease',
-  },
-  quizQuestion: {
-    fontSize: 16,
-    fontWeight: 600,
-    lineHeight: 1.6,
-    color: '#1a1a1a',
-    marginBottom: 16,
-  },
-  optionsList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-  },
-  optionBtn: {
-    padding: '12px 16px',
-    fontSize: 14,
-    textAlign: 'left',
-    background: '#fff',
-    border: '1px solid #d1d5db',
-    borderRadius: 8,
-    cursor: 'pointer',
-  },
-  optionSelected: {
-    padding: '12px 16px',
-    fontSize: 14,
-    textAlign: 'left',
-    background: '#eff6ff',
-    border: '2px solid #2563eb',
-    borderRadius: 8,
-    cursor: 'pointer',
-  },
-  optionCorrect: {
-    padding: '12px 16px',
-    fontSize: 14,
-    textAlign: 'left',
-    background: '#f0fdf4',
-    border: '2px solid #16a34a',
-    borderRadius: 8,
-    color: '#15803d',
-    cursor: 'not-allowed',
-  },
-  optionWrong: {
-    padding: '12px 16px',
-    fontSize: 14,
-    textAlign: 'left',
-    background: '#fef2f2',
-    border: '2px solid #dc2626',
-    borderRadius: 8,
-    color: '#dc2626',
-    cursor: 'not-allowed',
-  },
-  explanation: {
-    background: '#f8fafc',
-    border: '1px solid #e2e8f0',
-    borderRadius: 8,
-    padding: '12px 16px',
-    marginTop: 16,
-    fontSize: 14,
-    lineHeight: 1.6,
-  },
-  scoreDisplay: {
-    textAlign: 'center',
-    margin: '16px 0',
-  },
-  scoreBig: {
-    fontSize: 56,
-    fontWeight: 'bold',
-    color: '#2563eb',
-  },
-  scoreTotal: {
-    fontSize: 28,
-    color: '#888',
-  },
-  saveNoteBtn: {
-    marginTop: 8,
-    padding: '4px 10px',
-    fontSize: 12,
-    background: '#f3f4f6',
-    border: '1px solid #d1d5db',
-    borderRadius: 4,
-    cursor: 'pointer',
-    color: '#374151'
-  },
-  noteItem: {
-    padding: '12px',
-    borderBottom: '1px solid #e5e7eb',
-    marginBottom: 8
-  },
-  noteHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-    fontSize: 12,
-    color: '#6b7280'
-  },
-  noteType: {
-    background: '#dbeafe',
-    color: '#1e40af',
-    padding: '2px 8px',
-    borderRadius: 4,
-    fontWeight: 500
-  },
-  noteDate: {
-    color: '#9ca3af'
-  },
-  deleteNoteBtn: {
-    marginLeft: 'auto',
-    background: 'transparent',
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: 14
-  },
-  noteContent: {
-    fontSize: 14,
-    color: '#1f2937'
-  },
-  courseBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '12px 16px',
-    background: '#f9fafb',
-    borderBottom: '1px solid #e5e7eb',
-    marginBottom: 16
-  },
-  courseSelect: {
-    padding: '6px 10px',
-    fontSize: 14,
-    borderRadius: 6,
-    border: '1px solid #d1d5db',
-    background: '#fff',
-    minWidth: 200,
-    cursor: 'pointer'
-  },
-  btnSmall: {
-    padding: '4px 10px',
-    fontSize: 12,
-    background: '#2563eb',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 4,
-    cursor: 'pointer'
-  },
-  btnSmallDanger: {
-    padding: '4px 10px',
-    fontSize: 12,
-    background: '#dc2626',
-    color: '#fff',
-    border: 'none',
-    borderRadius: 4,
-    cursor: 'pointer'
+  const handleLogin = (userData) => {
+    setToken(getToken())
+    saveUserData(userData)
+    setUser(userData)
   }
+
+  const handleLogout = () => {
+    removeToken()
+    removeUserData()
+    window.location.reload()
+  }
+
+  const handleSelectCourse = (course) => {
+    setSelectedCourse(course)
+    setView('course')
+  }
+
+  const handleSelectPdf = (course, filename) => {
+    setSelectedCourse(course)
+    setSelectedPdf(filename)
+    setView('learn')
+  }
+
+  const handleUploadDone = () => {
+    setSidebarRefresh(prev => prev + 1)
+  }
+
+  if (!token) return <><GlobalStyle /><AuthScreen onLogin={handleLogin} /></>
+
+  return (
+    <div style={s.appLayout}>
+      <GlobalStyle />
+      <Sidebar
+        user={user}
+        selectedCourse={selectedCourse}
+        selectedPdf={selectedPdf}
+        onSelectCourse={handleSelectCourse}
+        onSelectPdf={handleSelectPdf}
+        onGoHome={() => { setView('courses'); setSelectedCourse(null); setSelectedPdf(null) }}
+        onLogout={handleLogout}
+        refreshKey={sidebarRefresh}
+      />
+      <main style={s.mainContent}>
+        {view === 'courses' && (
+          <CoursesView onSelectCourse={handleSelectCourse} />
+        )}
+        {view === 'course' && selectedCourse && (
+          <CourseDetailView
+            course={selectedCourse}
+            onSelectPdf={f => handleSelectPdf(selectedCourse, f)}
+            onBack={() => { setView('courses'); setSelectedCourse(null) }}
+            onUploadDone={handleUploadDone}
+          />
+        )}
+        {view === 'learn' && selectedPdf && (
+          <LearnView
+            filename={selectedPdf}
+            courseId={selectedCourse?.id}
+            onBack={() => setView('course')}
+          />
+        )}
+      </main>
+    </div>
+  )
 }
 
-export default App
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const glass = {
+  background: 'rgba(255,255,255,0.48)',
+  backdropFilter: 'blur(20px) saturate(150%)',
+  WebkitBackdropFilter: 'blur(20px) saturate(150%)',
+  border: '1px solid rgba(255,255,255,0.62)',
+}
+const glassSubtle = {
+  background: 'rgba(255,255,255,0.28)',
+  backdropFilter: 'blur(12px) saturate(130%)',
+  WebkitBackdropFilter: 'blur(12px) saturate(130%)',
+  border: '1px solid rgba(255,255,255,0.45)',
+}
+const ff = '"DM Sans", system-ui, sans-serif'
+const accent = '#444444'
+
+const ink = '#111111'
+const muted = 'rgba(0,0,0,0.48)'
+const faint = 'rgba(0,0,0,0.28)'
+
+const s = {
+  appLayout: { display: 'flex', minHeight: '100vh', fontFamily: ff },
+  mainContent: { marginLeft: 240, flex: 1, padding: '52px 72px', maxWidth: 1020, boxSizing: 'border-box' },
+
+  // Sidebar — transparent, merges with gradient
+  sidebar: { width: 240, height: '100vh', background: 'rgba(0,0,0,0.07)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRight: '1px solid rgba(0,0,0,0.08)', position: 'fixed', left: 0, top: 0, display: 'flex', flexDirection: 'column', zIndex: 100, boxSizing: 'border-box', overflowY: 'auto' },
+  sidebarLogo: { padding: '26px 22px 18px', fontSize: 18, fontWeight: 700, color: ink, letterSpacing: '-0.3px', borderBottom: '1px solid rgba(0,0,0,0.08)', cursor: 'pointer', flexShrink: 0 },
+  sidebarNav: { flex: 1, padding: '14px 0 8px', overflowY: 'auto' },
+  sidebarSection: { fontSize: 10, fontWeight: 600, color: faint, letterSpacing: 1.6, padding: '8px 20px 5px', margin: 0, textTransform: 'uppercase' },
+  sidebarCourseRow: { display: 'flex', alignItems: 'center', gap: 7, padding: '8px 20px', cursor: 'pointer', transition: 'background 0.15s', borderRadius: 0 },
+  sidebarCourseRowActive: { background: 'rgba(0,0,0,0.08)' },
+  sidebarChevron: { fontSize: 9, color: faint, width: 11, flexShrink: 0 },
+  sidebarCourseName: { fontSize: 13, color: ink, fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  sidebarPdfCount: { fontSize: 11, color: faint, flexShrink: 0 },
+  sidebarPdfItem: { display: 'flex', alignItems: 'center', gap: 7, padding: '6px 20px 6px 34px', cursor: 'pointer', transition: 'background 0.15s' },
+  sidebarPdfItemActive: { background: 'rgba(0,0,0,0.06)' },
+  sidebarPdfDot: { fontSize: 12, color: faint, flexShrink: 0, lineHeight: 1 },
+  sidebarPdfName: { fontSize: 12, color: muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  sidebarPdfLoading: { fontSize: 11, color: faint, padding: '4px 20px 4px 34px', margin: 0 },
+  sidebarFooter: { padding: '14px 18px', borderTop: '1px solid rgba(0,0,0,0.08)', flexShrink: 0 },
+  sidebarUserRow: { display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 },
+  sidebarUserIcon: { fontSize: 13, color: muted },
+  sidebarUserName: { fontSize: 12, color: muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 },
+  sidebarLogout: { display: 'flex', alignItems: 'center', gap: 7, width: '100%', padding: '9px 12px', fontSize: 13, fontWeight: 500, color: muted, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s' },
+  sidebarLogoutIcon: { fontSize: 13 },
+
+  // Auth
+  authBg: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  authCard: { ...glass, borderRadius: 22, padding: '48px 40px', width: 400, boxShadow: '0 8px 40px rgba(0,0,0,0.1)' },
+  authLogo: { fontSize: 24, fontWeight: 700, color: ink, marginBottom: 6, letterSpacing: '-0.3px' },
+  authSubtitle: { fontSize: 14, color: muted, marginBottom: 30, marginTop: 0 },
+  authInput: { width: '100%', padding: '12px 16px', fontSize: 14, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 10, marginBottom: 10, boxSizing: 'border-box', outline: 'none', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: ink, fontFamily: ff },
+  authBtn: { width: '100%', padding: '13px', fontSize: 14, fontWeight: 500, background: 'rgba(45,43,61,0.88)', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', marginTop: 4, fontFamily: ff },
+  authBtnDisabled: { width: '100%', padding: '13px', fontSize: 14, background: 'rgba(180,175,200,0.45)', color: '#fff', border: 'none', borderRadius: 10, cursor: 'not-allowed', fontFamily: ff, marginTop: 4 },
+  authError: { fontSize: 13, color: '#c0392b', marginBottom: 10, marginTop: -4 },
+  authToggle: { textAlign: 'center', fontSize: 13, color: muted, marginTop: 20 },
+  authToggleLink: { color: accent, cursor: 'pointer', textDecoration: 'none', fontWeight: 500 },
+
+  // Page
+  pageHeader: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 36 },
+  pageTitle: { fontSize: 22, fontWeight: 600, color: ink, margin: '0 0 28px', letterSpacing: '-0.2px' },
+  backBtn: { fontSize: 13, color: muted, background: 'transparent', border: 'none', cursor: 'pointer', padding: '0 0 20px', display: 'block' },
+  sectionTitle: { fontSize: 11, fontWeight: 600, color: faint, marginBottom: 14, marginTop: 30, textTransform: 'uppercase', letterSpacing: 1.2 },
+  loadingText: { color: muted, fontSize: 13 },
+  emptyState: { padding: '90px 0', textAlign: 'center' },
+  emptyText: { color: faint, fontSize: 14 },
+
+  actionBtn: { padding: '9px 20px', fontSize: 13, fontWeight: 500, background: 'rgba(45,43,61,0.82)', color: '#fff', border: 'none', borderRadius: 9, cursor: 'pointer' },
+  textBtn: { padding: '4px 0', fontSize: 13, fontWeight: 500, color: accent, background: 'transparent', border: 'none', cursor: 'pointer' },
+  cancelBtn: { padding: '9px 16px', fontSize: 13, background: 'transparent', color: muted, border: 'none', cursor: 'pointer' },
+  createForm: { display: 'flex', gap: 8, marginBottom: 32, alignItems: 'center' },
+  createInput: { padding: '10px 14px', fontSize: 14, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 9, flex: 1, outline: 'none', background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', fontFamily: ff },
+
+  courseGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 },
+  courseCard: { ...glass, borderRadius: 18, padding: '26px 24px', cursor: 'pointer', position: 'relative', transition: 'all 0.2s ease', boxShadow: '0 2px 16px rgba(0,0,0,0.07)', minHeight: 136 },
+  courseCardHover: { boxShadow: '0 10px 32px rgba(0,0,0,0.12)', transform: 'translateY(-2px)', background: 'rgba(255,255,255,0.6)' },
+  courseCardTitle: { fontSize: 16, fontWeight: 600, color: ink, margin: '0 0 7px', letterSpacing: '-0.2px' },
+  courseCardMeta: { fontSize: 12, color: muted, margin: 0 },
+  cardDeleteBtn: { position: 'absolute', top: 12, right: 14, width: 24, height: 24, border: 'none', background: 'transparent', color: faint, fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 0 },
+
+  uploadZone: { ...glassSubtle, borderRadius: 18, padding: '56px 36px', textAlign: 'center', cursor: 'pointer', marginBottom: 10, transition: 'all 0.2s ease' },
+  uploadZoneDrag: { background: `rgba(0,0,0,0.05)`, border: `1px solid rgba(0,0,0,0.2)` },
+  uploadIcon: { fontSize: 28, color: faint, marginBottom: 12 },
+  uploadLabel: { fontSize: 14, color: muted, margin: 0 },
+  uploadStatusText: { fontSize: 13, color: accent, marginTop: 8 },
+
+  progressBg: { background: 'rgba(0,0,0,0.1)', borderRadius: 99, height: 4, overflow: 'hidden', marginBottom: 28 },
+  progressFill: { background: `linear-gradient(90deg, #555, #888)`, height: 4, borderRadius: 99, transition: 'width 0.3s ease' },
+
+  pdfList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  pdfItem: { ...glass, display: 'flex', alignItems: 'center', gap: 14, borderRadius: 13, padding: '13px 18px', cursor: 'pointer', transition: 'all 0.18s', boxShadow: '0 1px 10px rgba(0,0,0,0.06)' },
+  pdfIcon: { width: 38, height: 38, background: `rgba(0,0,0,0.07)`, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: accent, flexShrink: 0, cursor: 'pointer' },
+  pdfInfo: { flex: 1, minWidth: 0, cursor: 'pointer' },
+  pdfName: { fontSize: 13, fontWeight: 500, color: ink, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  pdfMeta: { fontSize: 11, color: muted, margin: 0 },
+  pdfArrow: { fontSize: 15, color: faint, cursor: 'pointer' },
+  pdfDeleteBtn: { background: 'transparent', border: 'none', color: faint, fontSize: 20, cursor: 'pointer', padding: '0 4px', lineHeight: 1, flexShrink: 0 },
+
+  notesBar: { marginBottom: 20 },
+  notesToggle: { fontSize: 13, color: muted, background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px 0' },
+  notesPanel: { ...glass, borderRadius: 14, padding: '20px 24px', marginBottom: 24, boxShadow: '0 2px 14px rgba(0,0,0,0.06)' },
+  noteItem: { padding: '12px 0', borderBottom: `1px solid rgba(0,0,0,0.07)` },
+  noteHeader: { display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 },
+  noteType: { fontSize: 10, fontWeight: 600, background: `rgba(0,0,0,0.07)`, color: accent, padding: '2px 8px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  noteMeta: { fontSize: 11, color: faint },
+  noteDelete: { marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 18, color: faint, lineHeight: 1 },
+  noteContent: { fontSize: 13, color: ink },
+
+  modeGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 24 },
+  modeCard: { ...glass, borderRadius: 14, padding: '18px 20px', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' },
+  modeCardActive: { background: 'rgba(30,30,30,0.84)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.07)', boxShadow: `0 4px 20px rgba(0,0,0,0.18)` },
+  modeTitle: { fontSize: 15, fontWeight: 600, margin: '0 0 3px', color: ink },
+  modeDesc: { fontSize: 12, color: muted, margin: 0 },
+
+  contentArea: { ...glass, borderRadius: 18, padding: '32px 36px', boxShadow: '0 4px 28px rgba(0,0,0,0.08)' },
+  summaryBlock: { background: `rgba(0,0,0,0.04)`, borderRadius: 12, padding: '20px 24px', marginBottom: 14, border: `1px solid rgba(0,0,0,0.07)` },
+  summaryLang: { fontSize: 10, fontWeight: 600, color: `rgba(0,0,0,0.35)`, letterSpacing: 1.2, marginBottom: 8, marginTop: 0, textTransform: 'uppercase' },
+  summaryText: { fontSize: 14, lineHeight: 1.85, color: ink, margin: 0 },
+  contentLabel: { fontSize: 10, fontWeight: 600, color: faint, letterSpacing: 1.2, marginBottom: 12, marginTop: 0, textTransform: 'uppercase' },
+  vocabGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: 8 },
+  vocabItem: { background: `rgba(0,0,0,0.05)`, borderRadius: 9, padding: '8px 12px', fontSize: 13, color: ink },
+  saveNoteBtn: { marginTop: 24, padding: '7px 14px', fontSize: 12, background: 'transparent', border: 'none', cursor: 'pointer', color: muted },
+
+  chatHistory: { minHeight: 180, marginBottom: 24 },
+  userBubble: { background: `rgba(0,0,0,0.05)`, borderRadius: 12, padding: '12px 16px', marginBottom: 14, border: `1px solid rgba(0,0,0,0.07)` },
+  aiBubble: { padding: '12px 0', marginBottom: 14, borderBottom: `1px solid rgba(0,0,0,0.07)` },
+  bubbleLabel: { fontSize: 10, fontWeight: 600, color: `rgba(0,0,0,0.32)`, marginBottom: 6, marginTop: 0, textTransform: 'uppercase', letterSpacing: 0.5 },
+  bubbleText: { fontSize: 14, color: ink, margin: 0, lineHeight: 1.72 },
+  sourceTag: { fontSize: 11, color: accent, marginTop: 5, marginBottom: 0 },
+  inlineNoteBtn: { marginTop: 8, padding: '3px 10px', fontSize: 11, background: 'transparent', border: 'none', cursor: 'pointer', color: faint },
+  chatInputRow: { display: 'flex', gap: 8 },
+  chatInput: { flex: 1, padding: '12px 16px', fontSize: 14, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 11, outline: 'none', background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', color: ink, fontFamily: ff },
+  chatBtn: { padding: '12px 20px', fontSize: 13, fontWeight: 500, background: 'rgba(45,43,61,0.82)', color: '#fff', border: 'none', borderRadius: 11, cursor: 'pointer' },
+  chatBtnDisabled: { padding: '12px 20px', fontSize: 13, background: 'rgba(180,175,200,0.38)', color: '#fff', border: 'none', borderRadius: 11, cursor: 'not-allowed' },
+  clearBtn: { marginTop: 12, fontSize: 12, color: faint, background: 'transparent', border: 'none', cursor: 'pointer' },
+
+  quizMeta: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 },
+  quizMetaText: { fontSize: 13, color: muted },
+  quizScoreText: { fontSize: 13, color: accent, fontWeight: 600 },
+  quizQuestion: { fontSize: 17, fontWeight: 600, lineHeight: 1.6, color: ink, marginBottom: 20, marginTop: 0 },
+  optionsList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  optionBtn: { padding: '13px 18px', fontSize: 14, textAlign: 'left', background: 'rgba(255,255,255,0.42)', border: '1px solid rgba(255,255,255,0.6)', borderRadius: 11, cursor: 'pointer', color: ink, transition: 'all 0.15s', fontFamily: ff },
+  optionSelected: { padding: '13px 18px', fontSize: 14, textAlign: 'left', background: `rgba(0,0,0,0.08)`, border: `1px solid rgba(0,0,0,0.25)`, borderRadius: 11, cursor: 'pointer', color: ink, fontFamily: ff },
+  optionCorrect: { padding: '13px 18px', fontSize: 14, textAlign: 'left', background: 'rgba(22,163,74,0.07)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 11, color: '#15803d', cursor: 'default', fontFamily: ff },
+  optionWrong: { padding: '13px 18px', fontSize: 14, textAlign: 'left', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 11, color: '#dc2626', cursor: 'default', fontFamily: ff },
+  explanation: { background: `rgba(0,0,0,0.04)`, borderRadius: 11, padding: '15px 20px', marginTop: 18, fontSize: 13, lineHeight: 1.72, border: `1px solid rgba(0,0,0,0.07)` },
+
+  scoreCard: { textAlign: 'center', padding: '44px 0' },
+  scoreBig: { fontSize: 72, fontWeight: 700, color: ink, lineHeight: 1 },
+  scoreTotal: { fontSize: 36, color: faint },
+  scorePct: { fontSize: 15, color: muted, margin: '12px 0 24px' },
+}

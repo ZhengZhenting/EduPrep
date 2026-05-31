@@ -1,13 +1,12 @@
 import json
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional
+from typing import List, Optional, Any
 from dotenv import load_dotenv
 import anthropic
 import os
 from langchain_core.output_parsers import JsonOutputParser
 from pydantic import BaseModel, Field
-from typing import List
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy.orm import Session
@@ -62,7 +61,7 @@ class QuizResultRequest(BaseModel):
 class ChatMessage(BaseModel):
     role: str 
     content: str
-    sources: Optional[List] = []
+    sources: Optional[Any] = None
     source_type: Optional[str] = "pdf"
 
 class QuestionRequest(BaseModel):
@@ -489,7 +488,7 @@ async def ask_question(request: QuestionRequest,
         assistant_message = Message(
             pdf_file_id=pdf_file.id,
             role="assistant",
-            content=pdf_answer,
+            content=full_answer,
             source_type=source_type,
             sources=final_sources.get("urls", [])
         )
@@ -501,7 +500,7 @@ async def ask_question(request: QuestionRequest,
 
     return {
         "question": request.question,
-        "answer": pdf_answer,
+        "answer": full_answer,
         "web_supplement": web_supplement,
         "source_type": source_type,
         "sources": final_sources,
@@ -639,19 +638,27 @@ async def generate_preview(request: PreviewRequest,current_user: User = Depends(
 
         system_prompt_mindmap = f"""
                         You are a Mermaid diagram expert.
-                        Output ONLY valid Mermaid mindmap syntax.
+                        Output ONLY valid Mermaid graph TD syntax.
                         No markdown fences, no explanation, no text before or after."""
         mindmap_prompt = f"""
-                        Generate a Mermaid mindmap showing the structure of this lecture.
+                        Generate a Mermaid graph TD diagram showing the structure of this lecture.
                         Lecture content:{context}
 
                         Rules:
-                        - Use mindmap type
+                        - Start with: graph TD
                         - Maximum 3 levels deep
-                        - Maximum 15 nodes total
+                        - Maximum 12 nodes total
+                        - Use short node IDs like A, B, C, A1, A2
                         - All labels in German as they appear in the lecture
-                        - Keep node labels short, max 4 words
-                        - Output ONLY the Mermaid syntax, no markdown fences, no explanation"""
+                        - Keep node labels short, max 4 words, wrap in quotes: A["Label here"]
+                        - Use --> for connections
+                        - Output ONLY the Mermaid graph TD syntax, no markdown fences, no explanation
+
+                        Example format:
+                        graph TD
+                            A["Main Topic"] --> B["Subtopic 1"]
+                            A --> C["Subtopic 2"]
+                            B --> D["Detail 1"]"""
 
         with langfuse.start_as_current_observation(
             as_type="generation",
@@ -666,10 +673,17 @@ async def generate_preview(request: PreviewRequest,current_user: User = Depends(
                 messages=[{"role": "user", "content": mindmap_prompt}]
             )
             mindmap_raw = mindmap_message.content[0].text.strip()
+            # Strip any markdown code fences Claude may add despite the prompt
             if mindmap_raw.startswith("```"):
                 mindmap_raw = mindmap_raw.split("\n", 1)[-1]
-            if mindmap_raw.endswith("```"):
-                mindmap_raw = mindmap_raw.rsplit("```", 1)[0].strip()
+            # Find the closing fence and discard everything after it
+            if "```" in mindmap_raw:
+                mindmap_raw = mindmap_raw.split("```")[0].strip()
+            # Ensure the content starts at graph TD
+            if not mindmap_raw.startswith("graph"):
+                idx = mindmap_raw.find("graph")
+                if idx != -1:
+                    mindmap_raw = mindmap_raw[idx:]
 
             mindmap_gen.update(
                 output=mindmap_raw,
@@ -827,9 +841,41 @@ async def generate_quiz(request: QuizRequest,current_user: User = Depends(get_cu
 
 
 @app.post("/quiz/result")
-async def save_quiz_result(request: QuizResultRequest,current_user: User = Depends(get_current_user)):
-    save_quiz_memory(request.filename, request.score, request.total, request.course_id)
+async def save_quiz_result(request: QuizResultRequest, current_user: User = Depends(get_current_user)):
+    save_quiz_memory(request.filename, request.score, request.total, [], request.course_id)
     return {"message": "Quiz result saved successfully"}
+
+
+@app.delete("/pdfs/{pdf_file_id}")
+async def delete_pdf(pdf_file_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    pdf_file = db.query(PdfFile).join(Course).filter(
+        PdfFile.id == pdf_file_id,
+        Course.user_id == current_user.id
+    ).first()
+
+    if not pdf_file:
+        raise HTTPException(status_code=404, detail="PDF not found or not authorized.")
+
+    filename = pdf_file.filename
+
+    db.delete(pdf_file)
+    db.commit()
+
+    try:
+        from rag import sanitize_collection_name, get_embedding_function, CHROMA_DIR
+        from langchain_chroma import Chroma
+        collection_name = sanitize_collection_name(filename)
+        chroma_db = Chroma(
+            collection_name=collection_name,
+            embedding_function=get_embedding_function(),
+            persist_directory=CHROMA_DIR
+        )
+        chroma_db.delete_collection()
+        logger.info(f"ChromaDB collection deleted: {collection_name}")
+    except Exception as e:
+        logger.warning(f"Failed to delete ChromaDB collection for {filename}: {e}")
+
+    return {"message": f"{filename} deleted successfully"}
 
 
 @app.post("/notes")

@@ -70,21 +70,26 @@ function TextSegment({ content }) {
 // Mermaid 图表
 function MermaidSegment({ content }) {
     const ref = useRef(null)
-    const idRef = useRef(`mermaid-${Math.random().toString(36).slice(2)}`)
 
     useEffect(() => {
         if (!ref.current) return
 
-        ref.current.innerHTML = '' // 先清空容器
+        const container = ref.current
+        container.innerHTML = ''
 
-        mermaid.render(idRef.current, content)
+        let cancelled = false
+        const id = `mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+        mermaid.render(id, content)
             .then(({ svg }) => {
-                if (ref.current) ref.current.innerHTML = svg
+                if (!cancelled && container) container.innerHTML = svg
             })
             .catch((err) => {
-                if (ref.current)
-                    ref.current.innerHTML = `<pre style="color:red">Mermaid failed:${err.message}</pre>`
+                if (!cancelled && container)
+                    container.innerHTML = `<pre style="color:red;font-size:12px">Mermaid error: ${err.message}</pre>`
             })
+
+        return () => { cancelled = true }
     }, [content])
     return (
         <div
