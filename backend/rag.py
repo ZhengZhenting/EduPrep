@@ -84,8 +84,7 @@ def _bm25_search(
 def _reciprocal_rank_fusion(
         vector_results: list[tuple[Document, float]],
         bm25_results: list[tuple[Document, float]],
-        k: int=60
-)->list[tuple[Document, float]]:
+        k: int=60)->list[tuple[Document, float]]:
     """
     RRF（倒数排名融合）算法
     把向量检索和 BM25 的结果融合成一个排名

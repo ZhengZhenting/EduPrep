@@ -30,7 +30,7 @@ def _get_pdf_file_id(filename: str, course_id: int=1) -> int:
 # ----------- Learning Memory -----------
 # Data Structure
 def _default_memory() -> dict:
-    """返回空记忆的默认结构"""
+    """return default structure"""
     return {
         "weak_concepts": [],       
         "learning_style": "",      
@@ -40,7 +40,7 @@ def _default_memory() -> dict:
 
 # load / save memory
 def load_memory(filename: str, course_id: int=1) -> dict:
-    """读取某个PDF对应的用户记忆，文件不存在则返回默认结构"""
+    """read user memeory from a pdf, if empty return default structure"""
     db = SessionLocal()
     try:
         pdf_file_id = _get_pdf_file_id(filename, course_id)
@@ -57,7 +57,7 @@ def load_memory(filename: str, course_id: int=1) -> dict:
         db.close()
 
 def save_memory(filename: str, memory_data: dict, course_id: int=1):
-    """保存记忆到 JSON 文件"""
+    """save memeory to JSON"""
     db = SessionLocal()
     try:
         pdf_file_id = _get_pdf_file_id(filename, course_id)
@@ -84,11 +84,7 @@ def save_memory(filename: str, memory_data: dict, course_id: int=1):
 
 # Compress History
 def should_compress(history: list, memory: dict) -> bool:
-    """
-    只在以下两个条件同时满足时才压缩：
-    1. 对话历史达到6的倍数
-    2. 当前这批历史还没有被压缩过
-    """
+    """compress memory every 6 diaglogues"""
     count = len(history)
     if count == 0 or count % 6 != 0:
         return False
@@ -97,7 +93,7 @@ def should_compress(history: list, memory: dict) -> bool:
     return count > last_compressed_at
 
 def compress_history(history: list, memory: dict) -> str:
-    """把对话历史（6条完整对话）压缩成一段摘要，返回摘要字符串"""
+    """compress hisotry"""
     history_text = ""
     for msg in history:
         role_label = "Student" if msg.role == "user" else "Assistant"
@@ -116,7 +112,7 @@ def compress_history(history: list, memory: dict) -> str:
 
 # Update Memory
 def update_memory(filename: str, question: str, answer: str, memory: dict) -> dict:
-    """每次对话结束后，让 Claude 提取新的学习信息更新记忆"""
+    """after every dialogue update Claude with new learning information"""
     prompt = f"""Retrieve information from the following student question and assistant answer.
 
         Student Question: {question}
@@ -193,7 +189,7 @@ def load_quiz_memory(filename: str, course_id: int=1) -> dict:
 
 
 def save_quiz_memory(filename: str, score: int, total: int, wrong_questions: list = None, course_id: int=1):
-    """每次 Quiz 完成后调用，保存得分"""
+    """save score after every Quiz"""
     db = SessionLocal()
     try:
         pdf_file_id = _get_pdf_file_id(filename, course_id)

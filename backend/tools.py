@@ -10,7 +10,7 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
 # Helper functions
 def _extract_mermaid_body(raw: str) -> str:    
-    """从原始文本中提取Mermaid图表的主体内容，去掉可能的Markdown代码块标记和多余的空白。"""
+    """Mermaid text, remove markdown markings"""
     text = raw.strip()
     text = re.sub(r"^```(?:mermaid)?\s*\n?", "", text)  # remove beginning ```mermaid or ```
     text = re.sub(r"\n?```\s*$", "", text)              # remove trailing ```
@@ -40,7 +40,21 @@ def search_web(query: str) -> str:
     except Exception as e:
         return f"Web Search Error: {str(e)}"
 
-# Tool2: Mermaid Diagram Generator
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Tool2: Mermaid Diagram Generator NOT USED ANYMORE!!!
 @tool
 def generate_mermaid_chart(description: str) -> str:
     """Generate a Mermaid diagram from a natural-language description.

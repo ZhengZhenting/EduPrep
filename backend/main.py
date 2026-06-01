@@ -19,7 +19,7 @@ from rag import store_chunks, search_chunks, search_chunks_with_score
 from memory import load_memory, save_memory, compress_history, update_memory, should_compress, load_quiz_memory, save_quiz_memory
 from database import get_db, SessionLocal
 from models import User, Course, PdfFile, Message, Note, Memory, QuizProgress
-from tools import search_web, generate_mermaid_chart
+from tools import search_web
 from auth import (
     hash_password, verify_password,
     create_access_token, create_refresh_token,

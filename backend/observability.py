@@ -41,4 +41,3 @@ def verify_langfuse():
     except Exception as e:
         logger.warning(f"LangFuse connection failed: {e}")
         return False
-        return False
