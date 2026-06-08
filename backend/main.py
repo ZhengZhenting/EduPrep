@@ -490,7 +490,7 @@ async def ask_question(request: QuestionRequest,
             role="assistant",
             content=full_answer,
             source_type=source_type,
-            sources=final_sources.get("urls", [])
+            sources=final_sources
         )
         db.add(user_message)
         db.add(assistant_message)

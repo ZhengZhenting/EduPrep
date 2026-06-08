@@ -1,0 +1,178 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-preview: var(--preview);
+  --color-preview-glow: var(--preview-glow);
+  --color-learn: var(--learn);
+  --color-learn-glow: var(--learn-glow);
+  --color-quiz: var(--quiz);
+  --color-quiz-glow: var(--quiz-glow);
+
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+}
+
+:root {
+  --radius: 0.75rem;
+
+  /* Light warm theme */
+  --background: #F8F5F0;
+  --foreground: oklch(0.18 0.02 55);         /* warm near-black */
+
+  --card: rgba(255, 255, 255, 0.85);
+  --card-foreground: oklch(0.18 0.02 55);
+
+  --popover: #FFFFFF;
+  --popover-foreground: oklch(0.18 0.02 55);
+
+  --primary: oklch(0.56 0.24 15);            /* warm red */
+  --primary-foreground: #FFFFFF;
+
+  --secondary: oklch(0.94 0.02 75);          /* warm light beige */
+  --secondary-foreground: oklch(0.28 0.03 55);
+
+  --muted: oklch(0.92 0.02 75);
+  --muted-foreground: oklch(0.52 0.04 55);   /* warm medium gray */
+
+  --accent: oklch(0.76 0.18 80);             /* golden amber */
+  --accent-foreground: oklch(0.18 0.02 55);
+
+  --destructive: oklch(0.56 0.22 22);
+  --destructive-foreground: #FFFFFF;
+
+  --border: rgba(0, 0, 0, 0.09);
+  --input: rgba(0, 0, 0, 0.07);
+  --ring: oklch(0.56 0.24 15);
+
+  /* Module identities — warm palette */
+  --preview: oklch(0.84 0.16 92);            /* light yellow */
+  --preview-glow: oklch(0.90 0.12 96);
+  --learn: oklch(0.68 0.22 72);              /* golden amber */
+  --learn-glow: oklch(0.76 0.18 80);
+  --quiz: oklch(0.56 0.24 15);               /* warm red */
+  --quiz-glow: oklch(0.64 0.20 20);
+
+  --gradient-app:
+    radial-gradient(at 15% 10%, oklch(0.90 0.12 15 / 0.28), transparent 50%),
+    radial-gradient(at 85% 20%, oklch(0.92 0.12 80 / 0.24), transparent 55%),
+    radial-gradient(at 50% 90%, oklch(0.90 0.10 55 / 0.20), transparent 55%);
+  --gradient-preview: linear-gradient(135deg, oklch(0.80 0.18 88), oklch(0.90 0.13 96));
+  --gradient-learn:   linear-gradient(135deg, oklch(0.62 0.24 68), oklch(0.74 0.20 80));
+  --gradient-quiz:    linear-gradient(135deg, oklch(0.52 0.26 12), oklch(0.63 0.22 22));
+  --gradient-brand:   linear-gradient(135deg, oklch(0.54 0.26 12), oklch(0.70 0.24 52), oklch(0.80 0.20 84));
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  html, body, #root { min-height: 100%; }
+  body {
+    background-color: #F8F5F0;
+    color: var(--color-foreground);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+    background-image: var(--gradient-app);
+    background-attachment: fixed;
+  }
+}
+
+/* Light glassmorphism — white base */
+@utility glass {
+  background: rgba(255, 255, 255, 0.70);
+  backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+}
+
+@utility glass-strong {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+@utility gradient-text {
+  background: var(--gradient-brand);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+@utility glow-preview { box-shadow: 0 10px 40px -10px oklch(0.80 0.18 88 / 0.55); }
+@utility glow-learn   { box-shadow: 0 10px 40px -10px oklch(0.62 0.24 68 / 0.48); }
+@utility glow-quiz    { box-shadow: 0 10px 40px -10px oklch(0.52 0.26 12 / 0.45); }
+@utility glow-brand   { box-shadow: 0 0 0 1px rgba(0,0,0,0.04), 0 20px 60px -20px oklch(0.54 0.26 12 / 0.30); }
+
+@utility animated-border {
+  position: relative;
+  &::before {
+    content: "";
+    position: absolute; inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(from var(--angle, 0deg), oklch(0.54 0.26 12), oklch(0.70 0.24 52), oklch(0.80 0.20 84), oklch(0.54 0.26 12));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    animation: spin-border 6s linear infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes spin-border { to { --angle: 360deg; } }
+@property --angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-30px) translateX(20px); }
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@utility float-slow { animation: float-slow 12s ease-in-out infinite; }
+@utility pulse-glow { animation: pulse-glow 4s ease-in-out infinite; }
+@utility shake      { animation: shake 0.5s ease-in-out; }
+@utility shimmer-bg {
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.04), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}

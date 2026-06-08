@@ -10,18 +10,11 @@ function GlobalStyle() {
       html, body {
         margin: 0; padding: 0; min-height: 100vh;
         font-family: 'DM Sans', system-ui, sans-serif;
-        background: linear-gradient(150deg, #f0f0f0 0%, #e8e8e8 50%, #e3e3e3 100%);
-        background-attachment: fixed;
-      }
-      body::after {
-        content: '';
-        position: fixed; inset: 0; pointer-events: none; z-index: 9998;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-        opacity: 0.032;
+        background: #FAF7F2;
       }
       ::-webkit-scrollbar { width: 4px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+      ::-webkit-scrollbar-thumb { background: rgba(45,42,255,0.25); border-radius: 4px; }
     `}</style>
   )
 }
@@ -216,8 +209,8 @@ function Sidebar({ user, selectedCourse, selectedPdf, onSelectCourse, onSelectPd
                     style={{ ...s.sidebarPdfItem, ...(selectedPdf === pdf.filename ? s.sidebarPdfItemActive : {}) }}
                     onClick={() => onSelectPdf(c, pdf.filename)}
                   >
-                    <span style={s.sidebarPdfDot}>·</span>
-                    <span style={s.sidebarPdfName}>{pdf.filename.replace('.pdf', '')}</span>
+                    <span style={{ ...s.sidebarPdfDot, ...(selectedPdf === pdf.filename ? { color: ink } : {}) }}>·</span>
+                    <span style={{ ...s.sidebarPdfName, ...(selectedPdf === pdf.filename ? { color: ink, fontWeight: 600 } : {}) }}>{pdf.filename.replace('.pdf', '')}</span>
                   </div>
                 ))}
                 {!loadingPdfs[c.id] && (pdfMap[c.id] || []).length === 0 && (
@@ -317,9 +310,9 @@ function CoursesView({ onSelectCourse }) {
         </div>
       ) : (
         <div style={s.courseGrid}>
-          {courses.map(c => (
+          {courses.map((c, i) => (
             <div key={c.id}
-              style={{ ...s.courseCard, ...(hoveredId === c.id ? s.courseCardHover : {}) }}
+              style={{ ...s.courseCard, background: cardPalette[i % 4], borderColor: cardBorderPalette[i % 4], ...(hoveredId === c.id ? s.courseCardHover : {}) }}
               onClick={() => onSelectCourse(c)}
               onMouseEnter={() => setHoveredId(c.id)}
               onMouseLeave={() => setHoveredId(null)}>
@@ -710,7 +703,7 @@ function LearnView({ filename, courseId, onBack }) {
                   <p style={s.sourceTag}>Pages: {msg.sources.pages.join(', ')}</p>
                 )}
                 {msg.role === 'assistant' && msg.source_type === 'pdf+web' && (
-                  <p style={{ ...s.sourceTag, color: '#7c3aed' }}>PDF + Web</p>
+                  <p style={{ ...s.sourceTag, color: coral, fontWeight: 600 }}>PDF + Web</p>
                 )}
                 {msg.role === 'assistant' && (
                   <button style={s.inlineNoteBtn} onClick={() => saveNote('answer', msg.content)}>
@@ -798,7 +791,7 @@ function LearnView({ filename, courseId, onBack }) {
                 <div style={{
                   ...s.progressFill,
                   width: `${(score / quizQuestions.length) * 100}%`,
-                  background: score / quizQuestions.length >= 0.8 ? '#16a34a' : '#6366f1'
+                  background: score / quizQuestions.length >= 0.8 ? sage : coral
                 }} />
               </div>
               <button style={{ ...s.actionBtn, marginTop: 32 }} onClick={handleStartQuiz}>Try Again</button>
@@ -887,61 +880,67 @@ export default function App() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const glass = {
-  background: 'rgba(255,255,255,0.48)',
-  backdropFilter: 'blur(20px) saturate(150%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(150%)',
-  border: '1px solid rgba(255,255,255,0.62)',
+  background: '#FFFFFF',
+  border: '2px solid #111111',
 }
 const glassSubtle = {
-  background: 'rgba(255,255,255,0.28)',
-  backdropFilter: 'blur(12px) saturate(130%)',
-  WebkitBackdropFilter: 'blur(12px) saturate(130%)',
-  border: '1px solid rgba(255,255,255,0.45)',
+  background: '#FFFFFF',
+  border: '2px solid #111111',
 }
 const ff = '"DM Sans", system-ui, sans-serif'
-const accent = '#444444'
 
-const ink = '#111111'
-const muted = 'rgba(0,0,0,0.48)'
-const faint = 'rgba(0,0,0,0.28)'
+// ── Colour tokens ──────────────────────────────────────────────────────────────
+const indigo  = '#2D2AFF'   // primary — sidebar, buttons, active states
+const coral   = '#FF5C3A'   // secondary — alerts, pdf+web tag, wrong answers
+const sage    = '#7EC8A4'   // tertiary — correct answers, progress
+const yellow  = '#FFD166'   // highlight — active sidebar item, score accent
+const accent  = indigo
+
+const ink   = '#111111'
+const muted = 'rgba(0,0,0,0.52)'
+const faint = 'rgba(0,0,0,0.32)'
+
+// Course card background palette (cycles by index)
+const cardPalette = ['#EDE9FF', '#FFE8E3', '#E3F5EC', '#FFF6DE']
+const cardBorderPalette = ['#C4BFFF', '#FFBFB0', '#A8E4C4', '#FFE5A0']
 
 const s = {
   appLayout: { display: 'flex', minHeight: '100vh', fontFamily: ff },
   mainContent: { marginLeft: 240, flex: 1, padding: '52px 72px', maxWidth: 1020, boxSizing: 'border-box' },
 
-  // Sidebar — transparent, merges with gradient
-  sidebar: { width: 240, height: '100vh', background: 'rgba(0,0,0,0.07)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRight: '1px solid rgba(0,0,0,0.08)', position: 'fixed', left: 0, top: 0, display: 'flex', flexDirection: 'column', zIndex: 100, boxSizing: 'border-box', overflowY: 'auto' },
-  sidebarLogo: { padding: '26px 22px 18px', fontSize: 18, fontWeight: 700, color: ink, letterSpacing: '-0.3px', borderBottom: '1px solid rgba(0,0,0,0.08)', cursor: 'pointer', flexShrink: 0 },
+  // Sidebar — solid indigo
+  sidebar: { width: 240, height: '100vh', background: indigo, borderRight: 'none', position: 'fixed', left: 0, top: 0, display: 'flex', flexDirection: 'column', zIndex: 100, boxSizing: 'border-box', overflowY: 'auto' },
+  sidebarLogo: { padding: '26px 22px 18px', fontSize: 18, fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.3px', borderBottom: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer', flexShrink: 0 },
   sidebarNav: { flex: 1, padding: '14px 0 8px', overflowY: 'auto' },
-  sidebarSection: { fontSize: 10, fontWeight: 600, color: faint, letterSpacing: 1.6, padding: '8px 20px 5px', margin: 0, textTransform: 'uppercase' },
+  sidebarSection: { fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.45)', letterSpacing: 1.6, padding: '8px 20px 5px', margin: 0, textTransform: 'uppercase' },
   sidebarCourseRow: { display: 'flex', alignItems: 'center', gap: 7, padding: '8px 20px', cursor: 'pointer', transition: 'background 0.15s', borderRadius: 0 },
-  sidebarCourseRowActive: { background: 'rgba(0,0,0,0.08)' },
-  sidebarChevron: { fontSize: 9, color: faint, width: 11, flexShrink: 0 },
-  sidebarCourseName: { fontSize: 13, color: ink, fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  sidebarPdfCount: { fontSize: 11, color: faint, flexShrink: 0 },
-  sidebarPdfItem: { display: 'flex', alignItems: 'center', gap: 7, padding: '6px 20px 6px 34px', cursor: 'pointer', transition: 'background 0.15s' },
-  sidebarPdfItemActive: { background: 'rgba(0,0,0,0.06)' },
-  sidebarPdfDot: { fontSize: 12, color: faint, flexShrink: 0, lineHeight: 1 },
-  sidebarPdfName: { fontSize: 12, color: muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  sidebarPdfLoading: { fontSize: 11, color: faint, padding: '4px 20px 4px 34px', margin: 0 },
-  sidebarFooter: { padding: '14px 18px', borderTop: '1px solid rgba(0,0,0,0.08)', flexShrink: 0 },
+  sidebarCourseRowActive: { background: 'rgba(255,255,255,0.15)' },
+  sidebarChevron: { fontSize: 9, color: 'rgba(255,255,255,0.5)', width: 11, flexShrink: 0 },
+  sidebarCourseName: { fontSize: 13, color: '#FFFFFF', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  sidebarPdfCount: { fontSize: 11, color: 'rgba(255,255,255,0.45)', flexShrink: 0 },
+  sidebarPdfItem: { display: 'flex', alignItems: 'center', gap: 7, padding: '5px 12px 5px 34px', cursor: 'pointer', transition: 'all 0.15s', borderRadius: 8, margin: '1px 8px' },
+  sidebarPdfItemActive: { background: yellow },
+  sidebarPdfDot: { fontSize: 12, color: 'rgba(255,255,255,0.4)', flexShrink: 0, lineHeight: 1 },
+  sidebarPdfName: { fontSize: 12, color: 'rgba(255,255,255,0.75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  sidebarPdfLoading: { fontSize: 11, color: 'rgba(255,255,255,0.4)', padding: '4px 20px 4px 34px', margin: 0 },
+  sidebarFooter: { padding: '14px 18px', borderTop: '1px solid rgba(255,255,255,0.15)', flexShrink: 0 },
   sidebarUserRow: { display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 },
-  sidebarUserIcon: { fontSize: 13, color: muted },
-  sidebarUserName: { fontSize: 12, color: muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 },
-  sidebarLogout: { display: 'flex', alignItems: 'center', gap: 7, width: '100%', padding: '9px 12px', fontSize: 13, fontWeight: 500, color: muted, background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s' },
+  sidebarUserIcon: { fontSize: 13, color: 'rgba(255,255,255,0.6)' },
+  sidebarUserName: { fontSize: 12, color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 },
+  sidebarLogout: { display: 'flex', alignItems: 'center', gap: 7, width: '100%', padding: '9px 12px', fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.85)', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s' },
   sidebarLogoutIcon: { fontSize: 13 },
 
   // Auth
   authBg: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  authCard: { ...glass, borderRadius: 22, padding: '48px 40px', width: 400, boxShadow: '0 8px 40px rgba(0,0,0,0.1)' },
-  authLogo: { fontSize: 24, fontWeight: 700, color: ink, marginBottom: 6, letterSpacing: '-0.3px' },
+  authCard: { ...glass, borderRadius: 22, padding: '48px 40px', width: 400, boxShadow: '0 8px 40px rgba(45,42,255,0.12)' },
+  authLogo: { fontSize: 24, fontWeight: 700, color: indigo, marginBottom: 6, letterSpacing: '-0.3px' },
   authSubtitle: { fontSize: 14, color: muted, marginBottom: 30, marginTop: 0 },
-  authInput: { width: '100%', padding: '12px 16px', fontSize: 14, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 10, marginBottom: 10, boxSizing: 'border-box', outline: 'none', background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: ink, fontFamily: ff },
-  authBtn: { width: '100%', padding: '13px', fontSize: 14, fontWeight: 500, background: 'rgba(45,43,61,0.88)', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', marginTop: 4, fontFamily: ff },
-  authBtnDisabled: { width: '100%', padding: '13px', fontSize: 14, background: 'rgba(180,175,200,0.45)', color: '#fff', border: 'none', borderRadius: 10, cursor: 'not-allowed', fontFamily: ff, marginTop: 4 },
-  authError: { fontSize: 13, color: '#c0392b', marginBottom: 10, marginTop: -4 },
+  authInput: { width: '100%', padding: '12px 16px', fontSize: 14, border: '2px solid rgba(0,0,0,0.12)', borderRadius: 10, marginBottom: 10, boxSizing: 'border-box', outline: 'none', background: '#FAFAFA', color: ink, fontFamily: ff },
+  authBtn: { width: '100%', padding: '13px', fontSize: 14, fontWeight: 600, background: indigo, color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', marginTop: 4, fontFamily: ff },
+  authBtnDisabled: { width: '100%', padding: '13px', fontSize: 14, background: 'rgba(45,42,255,0.3)', color: '#fff', border: 'none', borderRadius: 10, cursor: 'not-allowed', fontFamily: ff, marginTop: 4 },
+  authError: { fontSize: 13, color: coral, marginBottom: 10, marginTop: -4 },
   authToggle: { textAlign: 'center', fontSize: 13, color: muted, marginTop: 20 },
-  authToggleLink: { color: accent, cursor: 'pointer', textDecoration: 'none', fontWeight: 500 },
+  authToggleLink: { color: indigo, cursor: 'pointer', textDecoration: 'none', fontWeight: 500 },
 
   // Page
   pageHeader: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 36 },
@@ -952,31 +951,31 @@ const s = {
   emptyState: { padding: '90px 0', textAlign: 'center' },
   emptyText: { color: faint, fontSize: 14 },
 
-  actionBtn: { padding: '9px 20px', fontSize: 13, fontWeight: 500, background: 'rgba(45,43,61,0.82)', color: '#fff', border: 'none', borderRadius: 9, cursor: 'pointer' },
-  textBtn: { padding: '4px 0', fontSize: 13, fontWeight: 500, color: accent, background: 'transparent', border: 'none', cursor: 'pointer' },
+  actionBtn: { padding: '9px 20px', fontSize: 13, fontWeight: 600, background: indigo, color: '#fff', border: 'none', borderRadius: 9, cursor: 'pointer' },
+  textBtn: { padding: '4px 0', fontSize: 13, fontWeight: 500, color: indigo, background: 'transparent', border: 'none', cursor: 'pointer' },
   cancelBtn: { padding: '9px 16px', fontSize: 13, background: 'transparent', color: muted, border: 'none', cursor: 'pointer' },
   createForm: { display: 'flex', gap: 8, marginBottom: 32, alignItems: 'center' },
-  createInput: { padding: '10px 14px', fontSize: 14, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 9, flex: 1, outline: 'none', background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', fontFamily: ff },
+  createInput: { padding: '10px 14px', fontSize: 14, border: '2px solid rgba(0,0,0,0.12)', borderRadius: 9, flex: 1, outline: 'none', background: '#FFFFFF', fontFamily: ff },
 
   courseGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 },
-  courseCard: { ...glass, borderRadius: 18, padding: '26px 24px', cursor: 'pointer', position: 'relative', transition: 'all 0.2s ease', boxShadow: '0 2px 16px rgba(0,0,0,0.07)', minHeight: 136 },
-  courseCardHover: { boxShadow: '0 10px 32px rgba(0,0,0,0.12)', transform: 'translateY(-2px)', background: 'rgba(255,255,255,0.6)' },
+  courseCard: { borderRadius: 18, padding: '26px 24px', cursor: 'pointer', position: 'relative', transition: 'all 0.2s ease', boxShadow: '0 2px 0px rgba(0,0,0,0.85)', minHeight: 136, border: '2px solid #111111' },
+  courseCardHover: { transform: 'translateY(-4px) rotate(1deg)', boxShadow: '0 8px 0px rgba(0,0,0,0.85)' },
   courseCardTitle: { fontSize: 16, fontWeight: 600, color: ink, margin: '0 0 7px', letterSpacing: '-0.2px' },
   courseCardMeta: { fontSize: 12, color: muted, margin: 0 },
-  cardDeleteBtn: { position: 'absolute', top: 12, right: 14, width: 24, height: 24, border: 'none', background: 'transparent', color: faint, fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 0 },
+  cardDeleteBtn: { position: 'absolute', top: 12, right: 14, width: 24, height: 24, border: 'none', background: 'transparent', color: 'rgba(0,0,0,0.35)', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 0 },
 
-  uploadZone: { ...glassSubtle, borderRadius: 18, padding: '56px 36px', textAlign: 'center', cursor: 'pointer', marginBottom: 10, transition: 'all 0.2s ease' },
-  uploadZoneDrag: { background: `rgba(0,0,0,0.05)`, border: `1px solid rgba(0,0,0,0.2)` },
-  uploadIcon: { fontSize: 28, color: faint, marginBottom: 12 },
+  uploadZone: { background: '#FFFFFF', border: `2px dashed rgba(0,0,0,0.2)`, borderRadius: 18, padding: '56px 36px', textAlign: 'center', cursor: 'pointer', marginBottom: 10, transition: 'all 0.2s ease' },
+  uploadZoneDrag: { background: '#EDE9FF', border: `2px dashed ${indigo}` },
+  uploadIcon: { fontSize: 28, color: indigo, marginBottom: 12 },
   uploadLabel: { fontSize: 14, color: muted, margin: 0 },
-  uploadStatusText: { fontSize: 13, color: accent, marginTop: 8 },
+  uploadStatusText: { fontSize: 13, color: indigo, marginTop: 8, fontWeight: 500 },
 
-  progressBg: { background: 'rgba(0,0,0,0.1)', borderRadius: 99, height: 4, overflow: 'hidden', marginBottom: 28 },
-  progressFill: { background: `linear-gradient(90deg, #555, #888)`, height: 4, borderRadius: 99, transition: 'width 0.3s ease' },
+  progressBg: { background: 'rgba(0,0,0,0.08)', borderRadius: 99, height: 5, overflow: 'hidden', marginBottom: 28 },
+  progressFill: { background: indigo, height: 5, borderRadius: 99, transition: 'width 0.3s ease' },
 
   pdfList: { display: 'flex', flexDirection: 'column', gap: 8 },
-  pdfItem: { ...glass, display: 'flex', alignItems: 'center', gap: 14, borderRadius: 13, padding: '13px 18px', cursor: 'pointer', transition: 'all 0.18s', boxShadow: '0 1px 10px rgba(0,0,0,0.06)' },
-  pdfIcon: { width: 38, height: 38, background: `rgba(0,0,0,0.07)`, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 600, color: accent, flexShrink: 0, cursor: 'pointer' },
+  pdfItem: { ...glass, display: 'flex', alignItems: 'center', gap: 14, borderRadius: 13, padding: '13px 18px', cursor: 'pointer', transition: 'all 0.18s', boxShadow: '2px 2px 0px #111111' },
+  pdfIcon: { width: 38, height: 38, background: '#EDE9FF', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: indigo, flexShrink: 0, cursor: 'pointer' },
   pdfInfo: { flex: 1, minWidth: 0, cursor: 'pointer' },
   pdfName: { fontSize: 13, fontWeight: 500, color: ink, margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   pdfMeta: { fontSize: 11, color: muted, margin: 0 },
@@ -994,46 +993,46 @@ const s = {
   noteContent: { fontSize: 13, color: ink },
 
   modeGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 24 },
-  modeCard: { ...glass, borderRadius: 14, padding: '18px 20px', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' },
-  modeCardActive: { background: 'rgba(30,30,30,0.84)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.07)', boxShadow: `0 4px 20px rgba(0,0,0,0.18)` },
+  modeCard: { background: '#FFFFFF', border: '2px solid #111111', borderRadius: 14, padding: '18px 20px', cursor: 'pointer', transition: 'all 0.2s ease', boxShadow: '2px 2px 0px #111111' },
+  modeCardActive: { background: indigo, border: `2px solid ${indigo}`, boxShadow: `3px 3px 0px rgba(0,0,0,0.5)` },
   modeTitle: { fontSize: 15, fontWeight: 600, margin: '0 0 3px', color: ink },
   modeDesc: { fontSize: 12, color: muted, margin: 0 },
 
-  contentArea: { ...glass, borderRadius: 18, padding: '32px 36px', boxShadow: '0 4px 28px rgba(0,0,0,0.08)' },
-  summaryBlock: { background: `rgba(0,0,0,0.04)`, borderRadius: 12, padding: '20px 24px', marginBottom: 14, border: `1px solid rgba(0,0,0,0.07)` },
-  summaryLang: { fontSize: 10, fontWeight: 600, color: `rgba(0,0,0,0.35)`, letterSpacing: 1.2, marginBottom: 8, marginTop: 0, textTransform: 'uppercase' },
+  contentArea: { background: '#FFFFFF', border: '2px solid #111111', borderRadius: 18, padding: '32px 36px', boxShadow: '4px 4px 0px #111111' },
+  summaryBlock: { background: '#FAF7F2', borderRadius: 12, padding: '20px 24px', marginBottom: 14, border: `1px solid rgba(0,0,0,0.08)` },
+  summaryLang: { fontSize: 10, fontWeight: 700, color: indigo, letterSpacing: 1.4, marginBottom: 8, marginTop: 0, textTransform: 'uppercase' },
   summaryText: { fontSize: 14, lineHeight: 1.85, color: ink, margin: 0 },
   contentLabel: { fontSize: 10, fontWeight: 600, color: faint, letterSpacing: 1.2, marginBottom: 12, marginTop: 0, textTransform: 'uppercase' },
   vocabGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(165px, 1fr))', gap: 8 },
-  vocabItem: { background: `rgba(0,0,0,0.05)`, borderRadius: 9, padding: '8px 12px', fontSize: 13, color: ink },
+  vocabItem: { background: '#EDE9FF', border: '1.5px solid #C4BFFF', borderRadius: 9, padding: '8px 12px', fontSize: 13, color: ink },
   saveNoteBtn: { marginTop: 24, padding: '7px 14px', fontSize: 12, background: 'transparent', border: 'none', cursor: 'pointer', color: muted },
 
   chatHistory: { minHeight: 180, marginBottom: 24 },
-  userBubble: { background: `rgba(0,0,0,0.05)`, borderRadius: 12, padding: '12px 16px', marginBottom: 14, border: `1px solid rgba(0,0,0,0.07)` },
+  userBubble: { background: '#EDE9FF', borderRadius: 12, padding: '12px 16px', marginBottom: 14, border: `1.5px solid #C4BFFF` },
   aiBubble: { padding: '12px 0', marginBottom: 14, borderBottom: `1px solid rgba(0,0,0,0.07)` },
-  bubbleLabel: { fontSize: 10, fontWeight: 600, color: `rgba(0,0,0,0.32)`, marginBottom: 6, marginTop: 0, textTransform: 'uppercase', letterSpacing: 0.5 },
+  bubbleLabel: { fontSize: 10, fontWeight: 700, color: indigo, marginBottom: 6, marginTop: 0, textTransform: 'uppercase', letterSpacing: 0.8 },
   bubbleText: { fontSize: 14, color: ink, margin: 0, lineHeight: 1.72 },
-  sourceTag: { fontSize: 11, color: accent, marginTop: 5, marginBottom: 0 },
+  sourceTag: { fontSize: 11, color: indigo, marginTop: 5, marginBottom: 0, fontWeight: 500 },
   inlineNoteBtn: { marginTop: 8, padding: '3px 10px', fontSize: 11, background: 'transparent', border: 'none', cursor: 'pointer', color: faint },
   chatInputRow: { display: 'flex', gap: 8 },
-  chatInput: { flex: 1, padding: '12px 16px', fontSize: 14, border: '1px solid rgba(0,0,0,0.12)', borderRadius: 11, outline: 'none', background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', color: ink, fontFamily: ff },
-  chatBtn: { padding: '12px 20px', fontSize: 13, fontWeight: 500, background: 'rgba(45,43,61,0.82)', color: '#fff', border: 'none', borderRadius: 11, cursor: 'pointer' },
-  chatBtnDisabled: { padding: '12px 20px', fontSize: 13, background: 'rgba(180,175,200,0.38)', color: '#fff', border: 'none', borderRadius: 11, cursor: 'not-allowed' },
+  chatInput: { flex: 1, padding: '12px 16px', fontSize: 14, border: '2px solid #111111', borderRadius: 11, outline: 'none', background: '#FFFFFF', color: ink, fontFamily: ff },
+  chatBtn: { padding: '12px 20px', fontSize: 13, fontWeight: 600, background: indigo, color: '#fff', border: 'none', borderRadius: 11, cursor: 'pointer' },
+  chatBtnDisabled: { padding: '12px 20px', fontSize: 13, background: 'rgba(45,42,255,0.3)', color: '#fff', border: 'none', borderRadius: 11, cursor: 'not-allowed' },
   clearBtn: { marginTop: 12, fontSize: 12, color: faint, background: 'transparent', border: 'none', cursor: 'pointer' },
 
   quizMeta: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 },
   quizMetaText: { fontSize: 13, color: muted },
-  quizScoreText: { fontSize: 13, color: accent, fontWeight: 600 },
+  quizScoreText: { fontSize: 13, color: indigo, fontWeight: 600 },
   quizQuestion: { fontSize: 17, fontWeight: 600, lineHeight: 1.6, color: ink, marginBottom: 20, marginTop: 0 },
   optionsList: { display: 'flex', flexDirection: 'column', gap: 8 },
-  optionBtn: { padding: '13px 18px', fontSize: 14, textAlign: 'left', background: 'rgba(255,255,255,0.42)', border: '1px solid rgba(255,255,255,0.6)', borderRadius: 11, cursor: 'pointer', color: ink, transition: 'all 0.15s', fontFamily: ff },
-  optionSelected: { padding: '13px 18px', fontSize: 14, textAlign: 'left', background: `rgba(0,0,0,0.08)`, border: `1px solid rgba(0,0,0,0.25)`, borderRadius: 11, cursor: 'pointer', color: ink, fontFamily: ff },
-  optionCorrect: { padding: '13px 18px', fontSize: 14, textAlign: 'left', background: 'rgba(22,163,74,0.07)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 11, color: '#15803d', cursor: 'default', fontFamily: ff },
-  optionWrong: { padding: '13px 18px', fontSize: 14, textAlign: 'left', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 11, color: '#dc2626', cursor: 'default', fontFamily: ff },
-  explanation: { background: `rgba(0,0,0,0.04)`, borderRadius: 11, padding: '15px 20px', marginTop: 18, fontSize: 13, lineHeight: 1.72, border: `1px solid rgba(0,0,0,0.07)` },
+  optionBtn: { padding: '13px 18px', fontSize: 14, textAlign: 'left', background: '#FFFFFF', border: '2px solid #111111', borderRadius: 11, cursor: 'pointer', color: ink, transition: 'all 0.15s', fontFamily: ff, boxShadow: '2px 2px 0px #111111' },
+  optionSelected: { padding: '13px 18px', fontSize: 14, textAlign: 'left', background: '#EDE9FF', border: `2px solid ${indigo}`, borderRadius: 11, cursor: 'pointer', color: indigo, fontFamily: ff, fontWeight: 500 },
+  optionCorrect: { padding: '13px 18px', fontSize: 14, textAlign: 'left', background: '#E3F5EC', border: `2px solid ${sage}`, borderRadius: 11, color: '#1a7a4a', cursor: 'default', fontFamily: ff, fontWeight: 500 },
+  optionWrong: { padding: '13px 18px', fontSize: 14, textAlign: 'left', background: '#FFE8E3', border: `2px solid ${coral}`, borderRadius: 11, color: coral, cursor: 'default', fontFamily: ff },
+  explanation: { background: '#FFF6DE', border: `1.5px solid #FFE5A0`, borderRadius: 11, padding: '15px 20px', marginTop: 18, fontSize: 13, lineHeight: 1.72 },
 
   scoreCard: { textAlign: 'center', padding: '44px 0' },
-  scoreBig: { fontSize: 72, fontWeight: 700, color: ink, lineHeight: 1 },
+  scoreBig: { fontSize: 72, fontWeight: 700, color: indigo, lineHeight: 1 },
   scoreTotal: { fontSize: 36, color: faint },
   scorePct: { fontSize: 15, color: muted, margin: '12px 0 24px' },
 }
