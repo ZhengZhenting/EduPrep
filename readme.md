@@ -3,6 +3,10 @@
 An AI-powered learning platform for international students in Germany. Reduces language barriers through a structured **Preview → Learn → Review** cycle.
 
 ---
+## Demo
+[![Demo Video](https://img.youtube.com/vi/EDPW8Nq5G64/0.jpg)](https://youtu.be/EDPW8Nq5G64)
+
+---
 
 ## Features
 
