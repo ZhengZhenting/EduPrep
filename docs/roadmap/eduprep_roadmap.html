@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduPrep — Roadmap</title>
+<style>
+  :root{
+    --bg:#0e1117; --panel:#161b22; --panel2:#1c2230; --border:#2a3340;
+    --text:#e6edf3; --muted:#9aa7b4; --accent:#5b9dff; --accent2:#7c5cff;
+    --green:#3fb950; --amber:#d29922; --pink:#db61a2; --cyan:#39c5cf;
+    --radius:14px; --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+    --sans:'DM Sans','Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-decoration:none}
+  .wrap{max-width:1080px;margin:0 auto;padding:48px 24px 96px}
+  /* i18n */
+  [data-lang="zh"] .en{display:none}
+  [data-lang="en"] .zh{display:none}
+  .langbar{position:fixed;top:18px;right:18px;z-index:50;display:flex;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--panel)}
+  .langbar button{background:transparent;border:none;color:var(--muted);font-family:var(--mono);font-size:13px;padding:8px 14px;cursor:pointer;transition:.15s}
+  .langbar button:hover{color:var(--text)}
+  [data-lang="zh"] .langbar button[data-set="zh"],[data-lang="en"] .langbar button[data-set="en"]{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+
+  header.hero{text-align:center;padding:40px 0 28px;border-bottom:1px solid var(--border);margin-bottom:40px}
+  .logo{display:inline-flex;align-items:center;gap:10px;font-weight:700;font-size:15px;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;margin-bottom:18px}
+  .logo .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2))}
+  h1{font-size:42px;margin:0 0 14px;font-weight:800;letter-spacing:-1px;
+     background:linear-gradient(120deg,#fff 20%,var(--accent) 60%,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tagline{font-size:18px;color:var(--muted);max-width:780px;margin:0 auto}
+  .meta{margin-top:18px;font-size:13px;color:var(--muted);font-family:var(--mono)}
+  .badge{display:inline-block;padding:3px 10px;border:1px solid var(--border);border-radius:20px;font-size:12px;color:var(--muted);margin:0 4px;font-family:var(--mono)}
+
+  h2{font-size:26px;margin:56px 0 8px;letter-spacing:-.4px}
+  h2 .num{color:var(--accent);font-family:var(--mono);font-size:18px;margin-right:8px}
+  .section-sub{color:var(--muted);margin:0 0 24px;font-size:15px}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:24px 26px;margin:18px 0}
+
+  .position{background:linear-gradient(135deg,rgba(91,157,255,.12),rgba(124,92,255,.10));border:1px solid var(--border);border-radius:var(--radius);padding:28px 30px;margin:20px 0}
+  .position .lead{font-size:20px;font-weight:700;margin:0 0 6px}
+  .position .desc{color:var(--muted);font-size:15px;margin:0}
+  .pills{margin-top:16px}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:5px 12px;margin:4px 6px 0 0;font-size:13px;font-family:var(--mono);color:var(--cyan)}
+
+  .loop{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:16px 0}
+  .loop .step{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+  .loop .step h4{margin:0 0 8px;font-size:16px}
+  .loop .step .old{color:var(--muted);font-size:13px;margin:0 0 8px}
+  .loop .step .new{color:var(--green);font-size:13px;margin:0;font-weight:600}
+  .loopnote{text-align:center;color:var(--muted);font-size:13px;font-style:italic;margin-top:6px}
+
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.4px}
+  td code{font-family:var(--mono);font-size:12.5px;background:var(--panel2);padding:1px 6px;border-radius:5px;color:var(--cyan)}
+  .tag-keep{color:var(--green);font-weight:600}
+  .tag-up{color:var(--accent);font-weight:600}
+  .tag-mig{color:var(--amber);font-weight:600}
+
+  .phase{position:relative;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:22px 24px 20px;margin:16px 0;overflow:hidden}
+  .phase::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+  .phase.p6::before{background:var(--cyan)} .phase.p7::before{background:var(--accent)}
+  .phase.p8::before{background:var(--accent)} .phase.p9::before{background:var(--pink)}
+  .phase.p10::before{background:var(--accent2)} .phase.p11::before{background:var(--amber)}
+  .phase.p12::before{background:var(--green)}
+  .phase-head{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px}
+  .phase-head h3{margin:0;font-size:20px;display:inline}
+  .phase-head .code{font-family:var(--mono);font-size:13px;color:var(--accent);margin-right:10px}
+  .phase-date{font-family:var(--mono);font-size:13px;color:var(--muted);background:var(--panel2);padding:4px 10px;border-radius:8px}
+  .phase-depth{display:inline-block;font-size:12px;padding:2px 9px;border-radius:6px;margin-top:6px;font-weight:600}
+  .depth-eng{background:rgba(57,197,207,.15);color:var(--cyan)}
+  .depth-algo{background:rgba(91,157,255,.15);color:var(--accent)}
+  .depth-domain{background:rgba(219,97,162,.15);color:var(--pink)}
+  .depth-frontier{background:rgba(124,92,255,.15);color:var(--accent2)}
+  .phase-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px}
+  @media(max-width:760px){.phase-grid{grid-template-columns:1fr}.loop{grid-template-columns:1fr}}
+  .phase-col h5{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+  .phase-col ul{margin:0;padding-left:18px}
+  .phase-col li{margin:4px 0;font-size:14px}
+  .phase-col li code{font-family:var(--mono);font-size:12px;color:var(--cyan)}
+  .doc-list li{color:var(--muted)}
+  .doc-list li::marker{color:var(--accent)}
+  .ov td .phase-depth{font-size:11px;padding:2px 7px}
+
+  .callout{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:10px;padding:14px 18px;margin:16px 0;font-size:14px;color:var(--text)}
+  .callout strong{color:var(--amber)}
+  footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--border);color:var(--muted);font-size:13px;text-align:center}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:10px 0 0;font-size:12px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body data-lang="zh">
+
+<div class="langbar">
+  <button data-set="zh" onclick="document.body.dataset.lang='zh'">中文</button>
+  <button data-set="en" onclick="document.body.dataset.lang='en'">EN</button>
+</div>
+
+<div class="wrap">
+
+  <header class="hero">
+    <div class="logo"><span class="dot"></span> EduPrep</div>
+    <h1>Project Roadmap</h1>
+    <p class="tagline">
+      <span class="zh">为在德国的国际学生打造的 AI 学习系统 —— 从"能聊 PDF 的工具"演进为"懂你学到哪、知道你哪里弱、按学习规律安排你学什么"的个性化学习伙伴。</span>
+      <span class="en">An AI learning system for international students in Germany — evolving from "a tool that chats with PDFs" into a personalised study companion that knows how far you've learned, where you're weak, and schedules what to study by the science of learning.</span>
+    </p>
+    <div class="meta">
+      <span class="badge">Start · 2026-06-20</span>
+      <span class="badge">P6 → P12</span>
+      <span class="badge">≈ 7 months</span>
+      <span class="badge">claude-opus-4-8 / sonnet-4-6</span>
+    </div>
+  </header>
+
+  <!-- 01 POSITIONING -->
+  <h2><span class="num">01</span><span class="zh">产品定位</span><span class="en">Product Positioning</span></h2>
+  <p class="section-sub">
+    <span class="zh">所有技术升级（知识图谱 / Agent / MCP）都是手段，主线永远是这个定位。</span>
+    <span class="en">Every technical upgrade (knowledge graph / Agent / MCP) is a means — the through-line is always this positioning.</span>
+  </p>
+  <div class="position">
+    <p class="lead">
+      <span class="zh">EduPrep 不只是回答你的问题 —— 它为你的每门课构建知识图谱，追踪你对每个概念的掌握度，并按遗忘曲线安排你的预习、学习与复习。</span>
+      <span class="en">EduPrep doesn't just answer your questions — it builds a knowledge graph for each of your courses, tracks your mastery of every concept, and schedules your Preview, Learn and Review along the forgetting curve.</span>
+    </p>
+    <p class="desc">
+      <span class="zh">差异化 = 个性化 (adaptive) · 知识图谱驱动 (knowledge-graph-driven) · 真正闭环的学习循环。区别于所有"逐个 PDF 聊天"的工具。</span>
+      <span class="en">Differentiation = adaptive · knowledge-graph-driven · a truly closed learning loop. Distinct from every "chat-with-a-single-PDF" tool.</span>
+    </p>
+    <div class="pills">
+      <span class="pill">Knowledge Graph</span>
+      <span class="pill">GraphRAG</span>
+      <span class="pill">Knowledge Tracing</span>
+      <span class="pill">Spaced Repetition (FSRS)</span>
+      <span class="pill">Agent + Tools + MCP</span>
+    </div>
+  </div>
+
+  <!-- 02 LOOP -->
+  <h2><span class="num">02</span><span class="zh">学习闭环的演进</span><span class="en">Evolution of the Learning Loop</span></h2>
+  <p class="section-sub">
+    <span class="zh">Preview → Learn → Review 不被替换，而是被"装上引擎"。新功能让三个独立 tab 真正串成会自我更新的循环。</span>
+    <span class="en">Preview → Learn → Review is not replaced — it gets an engine. New capabilities turn three isolated tabs into a self-updating loop.</span>
+  </p>
+  <div class="loop">
+    <div class="step">
+      <h4><span class="zh">① 预习 Preview</span><span class="en">① Preview</span></h4>
+      <p class="old"><span class="zh">现在：双语摘要 + 词汇 + Mermaid 思维导图</span><span class="en">Now: bilingual summary + vocabulary + Mermaid mind-map</span></p>
+      <p class="new"><span class="zh">→ 升级成真正的知识图谱：带先修关系、可点击、节点显示掌握度</span><span class="en">→ a real knowledge graph: prerequisite edges, clickable, nodes coloured by mastery</span></p>
+    </div>
+    <div class="step">
+      <h4><span class="zh">② 学习 Learn</span><span class="en">② Learn</span></h4>
+      <p class="old"><span class="zh">现在：RAG 问答 + web 补充</span><span class="en">Now: RAG Q&A + web supplement</span></p>
+      <p class="new"><span class="zh">→ Agent + GraphRAG：沿图谱补上下文、引用核对防幻觉、调用工具</span><span class="en">→ Agent + GraphRAG: graph-expanded context, citation verification against hallucination, tool calls</span></p>
+    </div>
+    <div class="step">
+      <h4><span class="zh">③ 复习 Review</span><span class="en">③ Review</span></h4>
+      <p class="old"><span class="zh">现在：quiz 出题 + 计分</span><span class="en">Now: quiz generation + scoring</span></p>
+      <p class="new"><span class="zh">→ 学习科学引擎：知识追踪 + 自适应出题 + FSRS 间隔重复</span><span class="en">→ learning-science engine: knowledge tracing + adaptive quizzing + FSRS spaced repetition</span></p>
+    </div>
+  </div>
+  <p class="loopnote">
+    <span class="zh">每次学习都更新「知识图谱 + 掌握度模型」→ 下一轮预习/出题/复习因此改变 ↻ 闭环真正闭上。</span>
+    <span class="en">Every study session updates the "knowledge graph + mastery model" → the next Preview/Quiz/Review changes accordingly ↻ the loop truly closes.</span>
+  </p>
+
+  <!-- 03 ARCHITECTURE -->
+  <h2><span class="num">03</span><span class="zh">架构关键判断：课程级 vs PDF 级</span><span class="en">Key Architecture Call: Course-level vs PDF-level</span></h2>
+  <p class="section-sub">
+    <span class="zh">学习的真实单位是「一门课」而非「一份 PDF」。知识层与学习者模型上升到课程级；物理文档层保留 PDF 级。叠加一层，不推翻重做。</span>
+    <span class="en">The real unit of learning is a course, not a PDF. The knowledge layer and learner model rise to course-level; the physical document layer stays PDF-level. A layer is added, nothing is torn down.</span>
+  </p>
+  <div class="panel">
+    <table>
+      <thead><tr>
+        <th><span class="zh">层</span><span class="en">Layer</span></th>
+        <th><span class="zh">粒度</span><span class="en">Granularity</span></th>
+        <th><span class="zh">处理</span><span class="en">Action</span></th>
+      </tr></thead>
+      <tbody>
+        <tr><td><span class="zh">文档层</span><span class="en">Document layer</span> <code>pdf_file</code> · ChromaDB</td><td>PDF</td><td class="tag-keep"><span class="zh">保留不变</span><span class="en">unchanged</span></td></tr>
+        <tr><td><span class="zh">对话 / 笔记</span><span class="en">Chat / notes</span> <code>message</code> <code>note</code></td><td>PDF</td><td class="tag-keep"><span class="zh">保留不变</span><span class="en">unchanged</span></td></tr>
+        <tr><td><span class="zh">预习 Preview</span><span class="en">Preview</span></td><td>PDF</td><td class="tag-keep"><span class="zh">保留不变</span><span class="en">unchanged</span></td></tr>
+        <tr><td><span class="zh">知识图谱</span><span class="en">Knowledge graph</span> <code>concept</code> <code>concept_edge</code></td><td><span class="zh">课程</span><span class="en">Course</span></td><td class="tag-up"><span class="zh">新增 ⬆</span><span class="en">new ⬆</span></td></tr>
+        <tr><td><span class="zh">学习者模型</span><span class="en">Learner model</span> <code>concept_mastery</code></td><td><span class="zh">课程</span><span class="en">Course</span></td><td class="tag-up"><span class="zh">新增 ⬆</span><span class="en">new ⬆</span></td></tr>
+        <tr><td><span class="zh">学习路径</span><span class="en">Learning path</span> <code>learning_path</code></td><td><span class="zh">课程</span><span class="en">Course</span></td><td class="tag-up"><span class="zh">新增 ⬆</span><span class="en">new ⬆</span></td></tr>
+        <tr><td><span class="zh">薄弱概念</span><span class="en">Weak concepts</span> <code>memory.weak_concepts</code></td><td>PDF → <span class="zh">课程</span><span class="en">Course</span></td><td class="tag-mig"><span class="zh">迁移 🔄</span><span class="en">migrate 🔄</span></td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <strong><span class="zh">增量演进：</span><span class="en">Incremental growth: </span></strong>
+      <span class="zh">每上传一份新 PDF → 异步抽取概念 → 与课程已有图谱做实体消歧 → 命中旧概念只追加 <code>source_refs</code> 来源，新概念才建节点。图谱随一学期持续生长，不全量重建。详见 </span>
+      <span class="en">Each new PDF → async concept extraction → entity disambiguation against the course graph → existing concepts only append a <code>source_refs</code> source, new ones create nodes. The graph grows across a semester, never fully rebuilt. See </span>
+      <a href="../architecture/knowledge-graph-schema.md">knowledge-graph-schema.md</a>.
+    </div>
+  </div>
+
+  <!-- 04 PHASES -->
+  <h2><span class="num">04</span><span class="zh">分阶段计划（P6 → P12）</span><span class="en">Phased Plan (P6 → P12)</span></h2>
+  <p class="section-sub">
+    <span class="zh">依赖顺序：度量基线 → 知识图谱 → GraphRAG → 学习科学 → Agent/MCP → 加固 → 测试/部署。每阶段自带文档产出。</span>
+    <span class="en">Dependency order: evaluation baseline → knowledge graph → GraphRAG → learning science → Agent/MCP → hardening → testing/deploy. Each phase ships its own docs.</span>
+  </p>
+
+  <div class="legend">
+    <span><i style="background:var(--cyan)"></i><span class="zh">工程深度</span><span class="en">Engineering</span></span>
+    <span><i style="background:var(--accent)"></i><span class="zh">算法深度</span><span class="en">Algorithmic</span></span>
+    <span><i style="background:var(--pink)"></i><span class="zh">领域深度</span><span class="en">Domain</span></span>
+    <span><i style="background:var(--accent2)"></i><span class="zh">技术前沿</span><span class="en">Frontier</span></span>
+  </div>
+
+  <!-- P6 -->
+  <div class="phase p6">
+    <div class="phase-head">
+      <div><span class="code">P6</span><h3><span class="zh">Evaluation 基线 + 文档地基</span><span class="en">Evaluation Baseline + Docs Foundation</span></h3></div>
+      <span class="phase-date">06-20 → 07-11 · 3w</span>
+    </div>
+    <span class="phase-depth depth-eng"><span class="zh">工程深度 · 度量能力</span><span class="en">Engineering · measurement</span></span>
+    <p class="section-sub" style="margin:10px 0 0">
+      <span class="zh">先建"能量化系统"的能力 —— 没有基线，后面所有"更好"都没有证据。这是被说"深度不够"的根因。</span>
+      <span class="en">Build the ability to quantify the system first — without a baseline, every later "better" lacks proof. This is the root cause of "not deep enough".</span>
+    </p>
+    <div class="phase-grid">
+      <div class="phase-col">
+        <h5><span class="zh">功能 / 技术</span><span class="en">Features / Tech</span></h5>
+        <ul>
+          <li><span class="zh">黄金数据集：3–5 份德语 PDF + 30 组标准 Q&A</span><span class="en">Golden dataset: 3–5 German PDFs + 30 reference Q&A pairs</span></li>
+          <li><span class="zh">检索评测：recall@k · precision@k · MRR</span><span class="en">Retrieval eval: recall@k · precision@k · MRR</span></li>
+          <li><span class="zh">回答评测：cosine 相似度 + LLM-as-judge</span><span class="en">Answer eval: cosine similarity + LLM-as-judge</span></li>
+          <li><span class="zh">评测脚本 <code>eval/run_eval.py</code>，新增 <code>eval_run</code> 表</span><span class="en">Eval script <code>eval/run_eval.py</code>, new <code>eval_run</code> table</span></li>
+        </ul>
+      </div>
+      <div class="phase-col">
+        <h5><span class="zh">文档产出</span><span class="en">Docs Deliverables</span></h5>
+        <ul class="doc-list">
+          <li><span class="zh">重做 <code>README</code>：badges + 架构图 + Quick Start + 双语</span><span class="en">Rework <code>README</code>: badges + architecture diagram + Quick Start + bilingual</span></li>
+          <li><code>LICENSE</code> · <code>CONTRIBUTING</code> · <code>SECURITY</code></li>
+          <li><code>docs/evaluation/baseline.md</code></li>
+          <li><span class="zh">用户研究轻量版：Personas · 旅程图 · 痛点→功能映射 · 竞品分析</span><span class="en">Light user research: personas · journey map · pain→feature map · competitor analysis</span></li>
+          <li><code>ADR-0001</code> ChromaDB · <code>ADR-0002</code> <span class="zh">切块策略</span><span class="en">chunking</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- P7 -->
+  <div class="phase p7">
+    <div class="phase-head">
+      <div><span class="code">P7</span><h3><span class="zh">知识图谱构建 + 可视化</span><span class="en">Knowledge Graph Construction + Visualization</span></h3></div>
+      <span class="phase-date">07-11 → 08-15 · 5w</span>
+    </div>
+    <span class="phase-depth depth-algo"><span class="zh">算法深度 · 核心</span><span class="en">Algorithmic · core</span></span>
+    <p class="section-sub" style="margin:10px 0 0">
+      <span class="zh">把零散 PDF 缝成课程级概念网络。老师建议的核心深度点。</span>
+      <span class="en">Stitch scattered PDFs into a course-level concept network. The core depth point your professor suggested.</span>
+    </p>
+    <div class="phase-grid">
+      <div class="phase-col">
+        <h5><span class="zh">功能 / 技术</span><span class="en">Features / Tech</span></h5>
+        <ul>
+          <li><span class="zh">概念抽取：Claude 结构化输出 概念 + 关系</span><span class="en">Concept extraction: Claude structured output of concepts + relations</span></li>
+          <li><span class="zh">关系类型</span><span class="en">Relations</span>: <code>prerequisite</code> <code>related</code> <code>part_of</code> <code>equivalent_de</code></li>
+          <li><span class="zh">实体消歧 + 增量合并（embedding 相似度 + Claude 裁决）</span><span class="en">Entity disambiguation + incremental merge (embedding similarity + Claude adjudication)</span></li>
+          <li><span class="zh">图谱可视化：react-flow / cytoscape.js</span><span class="en">Graph viz: react-flow / cytoscape.js</span></li>
+          <li><span class="zh">引入 <code>Celery + Redis</code> 异步处理抽取</span><span class="en">Introduce <code>Celery + Redis</code> for async extraction</span></li>
+          <li><span class="zh">新增 4 表</span><span class="en">4 new tables</span>: <code>concept</code> <code>concept_edge</code> <code>concept_mastery</code> <code>learning_path</code></li>
+        </ul>
+      </div>
+      <div class="phase-col">
+        <h5><span class="zh">文档产出</span><span class="en">Docs Deliverables</span></h5>
+        <ul class="doc-list">
+          <li><a href="../architecture/knowledge-graph-schema.md">knowledge-graph-schema.md</a> <span class="zh">✅ 已起草</span><span class="en">✅ drafted</span></li>
+          <li><code>concept-extraction-pipeline.md</code></li>
+          <li><code>ADR-0003</code> <span class="zh">图存储 PG vs Neo4j · JSONB vs pgvector</span><span class="en">graph storage PG vs Neo4j · JSONB vs pgvector</span></li>
+          <li><span class="zh">更新</span><span class="en">Update</span> <code>er_diagram.svg</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- P8 -->
+  <div class="phase p8">
+    <div class="phase-head">
+      <div><span class="code">P8</span><h3><span class="zh">GraphRAG 检索 + 学习路径</span><span class="en">GraphRAG Retrieval + Learning Path</span></h3></div>
+      <span class="phase-date">08-15 → 09-12 · 4w</span>
+    </div>
+    <span class="phase-depth depth-algo"><span class="zh">算法深度</span><span class="en">Algorithmic</span></span>
+    <p class="section-sub" style="margin:10px 0 0">
+      <span class="zh">让图谱真正参与检索，并用 P6 评测证明它更好。</span>
+      <span class="en">Make the graph actually drive retrieval, and prove it's better with the P6 eval set.</span>
+    </p>
+    <div class="phase-grid">
+      <div class="phase-col">
+        <h5><span class="zh">功能 / 技术</span><span class="en">Features / Tech</span></h5>
+        <ul>
+          <li><span class="zh">GraphRAG：命中概念沿图扩展 1–2 跳，融合进 BM25+vector+RRF</span><span class="en">GraphRAG: expand 1–2 hops from matched concepts, fused into BM25+vector+RRF</span></li>
+          <li><span class="zh">学习路径：按 <code>prerequisite</code> 边拓扑排序</span><span class="en">Learning path: topological sort over <code>prerequisite</code> edges</span></li>
+          <li><span class="zh">A/B 评测：纯向量 vs GraphRAG 出对比数据</span><span class="en">A/B eval: vector-only vs GraphRAG comparison numbers</span></li>
+        </ul>
+      </div>
+      <div class="phase-col">
+        <h5><span class="zh">文档产出</span><span class="en">Docs Deliverables</span></h5>
+        <ul class="doc-list">
+          <li><code>docs/evaluation/graphrag-vs-baseline.md</code></li>
+          <li><code>retrieval-flow.md</code></li>
+          <li><code>ADR-0004</code> GraphRAG</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- P9 -->
+  <div class="phase p9">
+    <div class="phase-head">
+      <div><span class="code">P9</span><h3><span class="zh">学习科学引擎</span><span class="en">Learning-Science Engine</span></h3></div>
+      <span class="phase-date">09-12 → 10-17 · 5w</span>
+    </div>
+    <span class="phase-depth depth-domain"><span class="zh">领域深度</span><span class="en">Domain</span></span>
+    <p class="section-sub" style="margin:10px 0 0">
+      <span class="zh">把"问答工具"变成"懂学习规律的系统"。建议此节点推首版到 GitHub。</span>
+      <span class="en">Turn a "Q&A tool" into a "system that understands learning". Recommended point to push the first public version to GitHub.</span>
+    </p>
+    <div class="phase-grid">
+      <div class="phase-col">
+        <h5><span class="zh">功能 / 技术</span><span class="en">Features / Tech</span></h5>
+        <ul>
+          <li><span class="zh">知识追踪：BKT，按 quiz 更新概念掌握度</span><span class="en">Knowledge tracing: BKT, updates concept mastery from quizzes</span></li>
+          <li><span class="zh">掌握度热力图：概念图节点上色（红=弱 / 绿=会）</span><span class="en">Mastery heat-map: graph nodes coloured (red=weak / green=mastered)</span></li>
+          <li><span class="zh">间隔重复：FSRS 调度器，复习项挂到概念</span><span class="en">Spaced repetition: FSRS scheduler, review items tied to concepts</span></li>
+          <li><span class="zh">自适应出题：优先薄弱概念 + 按掌握度调难度</span><span class="en">Adaptive quizzing: prioritise weak concepts + difficulty by mastery</span></li>
+        </ul>
+      </div>
+      <div class="phase-col">
+        <h5><span class="zh">文档产出</span><span class="en">Docs Deliverables</span></h5>
+        <ul class="doc-list">
+          <li><code>learning-science-engine.md</code></li>
+          <li><code>ADR-0005</code> BKT · <code>ADR-0006</code> FSRS</li>
+          <li><span class="zh">用户研究重量版：真实访谈 + 可用性测试</span><span class="en">Full user research: real interviews + usability tests</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- P10 -->
+  <div class="phase p10">
+    <div class="phase-head">
+      <div><span class="code">P10</span><h3><span class="zh">Agent + Tools + MCP</span><span class="en">Agent + Tools + MCP</span></h3></div>
+      <span class="phase-date">10-17 → 11-21 · 5w</span>
+    </div>
+    <span class="phase-depth depth-frontier"><span class="zh">技术前沿</span><span class="en">Frontier</span></span>
+    <p class="section-sub" style="margin:10px 0 0">
+      <span class="zh">把写死的 /ask 流水线升级成会决策的 Agent；用 MCP 把项目从"应用"抬成"平台"。</span>
+      <span class="en">Upgrade the hard-coded /ask pipeline into a decision-making Agent; use MCP to lift the project from "an app" to "a platform".</span>
+    </p>
+    <div class="phase-grid">
+      <div class="phase-col">
+        <h5><span class="zh">功能 / 技术</span><span class="en">Features / Tech</span></h5>
+        <ul>
+          <li><span class="zh">Agent 编排：<code>LangGraph</code>，Planner → Tool Router → Reflector</span><span class="en">Agent orchestration: <code>LangGraph</code>, Planner → Tool Router → Reflector</span></li>
+          <li><span class="zh">工具</span><span class="en">Tools</span>: <code>query_knowledge_graph</code> · <code>get_concept_mastery</code> · <code>schedule_review</code> · <code>generate_adaptive_quiz</code> · <code>verify_citation</code></li>
+          <li><span class="zh">MCP Server：把学习能力暴露给 Claude Desktop / Cursor</span><span class="en">MCP Server: expose learning capabilities to Claude Desktop / Cursor</span></li>
+          <li><span class="zh">模型分层：主循环 <code>claude-opus-4-8</code>，工具抽取 <code>claude-sonnet-4-6</code></span><span class="en">Model tiering: <code>claude-opus-4-8</code> for the main loop, <code>claude-sonnet-4-6</code> for tool extraction</span></li>
+        </ul>
+      </div>
+      <div class="phase-col">
+        <h5><span class="zh">文档产出</span><span class="en">Docs Deliverables</span></h5>
+        <ul class="doc-list">
+          <li><code>agent-orchestration.md</code></li>
+          <li><code>mcp-server.md</code></li>
+          <li><code>ADR-0007</code> LangGraph vs <span class="zh">自研循环</span><span class="en">custom loop</span></li>
+          <li><span class="zh">更新 README：加 "EduPrep as MCP Server" 卖点</span><span class="en">Update README: add the "EduPrep as MCP Server" selling point</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- P11 -->
+  <div class="phase p11">
+    <div class="phase-head">
+      <div><span class="code">P11</span><h3><span class="zh">加固：性能 / 可靠性 / 安全</span><span class="en">Hardening: Performance / Reliability / Security</span></h3></div>
+      <span class="phase-date">11-21 → 12-12 · 3w</span>
+    </div>
+    <span class="phase-depth depth-eng"><span class="zh">工程深度</span><span class="en">Engineering</span></span>
+    <div class="phase-grid">
+      <div class="phase-col">
+        <h5><span class="zh">功能 / 技术</span><span class="en">Features / Tech</span></h5>
+        <ul>
+          <li><span class="zh">Redis 缓存（key=SHA256(question+filename), TTL 24h）</span><span class="en">Redis cache (key=SHA256(question+filename), TTL 24h)</span></li>
+          <li><span class="zh">限流：token bucket，10/min/user on /ask</span><span class="en">Rate limiting: token bucket, 10/min/user on /ask</span></li>
+          <li><span class="zh">Claude API 熔断器 (pybreaker) + 降级响应</span><span class="en">Claude API circuit breaker (pybreaker) + degraded response</span></li>
+          <li><span class="zh">Prompt injection 检测 + Pydantic 校验 + CORS 白名单</span><span class="en">Prompt-injection detection + Pydantic validation + CORS whitelist</span></li>
+        </ul>
+      </div>
+      <div class="phase-col">
+        <h5><span class="zh">文档产出</span><span class="en">Docs Deliverables</span></h5>
+        <ul class="doc-list">
+          <li><code>reliability.md</code></li>
+          <li><code>ADR-0008</code> <span class="zh">缓存策略</span><span class="en">caching strategy</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- P12 -->
+  <div class="phase p12">
+    <div class="phase-head">
+      <div><span class="code">P12</span><h3><span class="zh">测试 + Docker + CI/CD + 监控</span><span class="en">Testing + Docker + CI/CD + Monitoring</span></h3></div>
+      <span class="phase-date">12-12 → 2027-01-16 · 5w</span>
+    </div>
+    <span class="phase-depth depth-eng"><span class="zh">工程深度 · 收尾</span><span class="en">Engineering · finishing</span></span>
+    <div class="phase-grid">
+      <div class="phase-col">
+        <h5><span class="zh">功能 / 技术</span><span class="en">Features / Tech</span></h5>
+        <ul>
+          <li><span class="zh">pytest >80% 覆盖 + TestClient 集成测试 (mock Claude)</span><span class="en">pytest >80% coverage + TestClient integration tests (mock Claude)</span></li>
+          <li><span class="zh">Locust 负载测试（10 并发，找 P99 瓶颈）</span><span class="en">Locust load test (10 concurrent, find P99 bottleneck)</span></li>
+          <li><span class="zh">Dockerfile + docker-compose 全栈</span><span class="en">Dockerfile + full-stack docker-compose</span></li>
+          <li><span class="zh">GitHub Actions：CI (pytest+black+eslint) / CD</span><span class="en">GitHub Actions: CI (pytest+black+eslint) / CD</span></li>
+          <li><span class="zh">Prometheus + Grafana + Jaeger 全链路监控</span><span class="en">Prometheus + Grafana + Jaeger full-stack observability</span></li>
+        </ul>
+      </div>
+      <div class="phase-col">
+        <h5><span class="zh">文档产出</span><span class="en">Docs Deliverables</span></h5>
+        <ul class="doc-list">
+          <li><code>deployment.md</code> · <code>testing.md</code></li>
+          <li><code>docs/evaluation/load-test-report.md</code></li>
+          <li><code>docs/roadmap.md</code></li>
+          <li><span class="zh">技术博客 1–2 篇</span><span class="en">1–2 technical blog posts</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 05 OVERVIEW -->
+  <h2><span class="num">05</span><span class="zh">总览</span><span class="en">Overview</span></h2>
+  <div class="panel ov">
+    <table>
+      <thead><tr>
+        <th><span class="zh">阶段</span><span class="en">Phase</span></th>
+        <th><span class="zh">时间</span><span class="en">Dates</span></th>
+        <th><span class="zh">核心交付</span><span class="en">Core deliverable</span></th>
+        <th><span class="zh">深度</span><span class="en">Depth</span></th>
+      </tr></thead>
+      <tbody>
+        <tr><td><code>P6</code></td><td>6/20–7/11</td><td><span class="zh">Evaluation 基线 + 文档地基</span><span class="en">Evaluation baseline + docs foundation</span></td><td><span class="phase-depth depth-eng"><span class="zh">工程</span><span class="en">Eng</span></span></td></tr>
+        <tr><td><code>P7</code></td><td>7/11–8/15</td><td><span class="zh">知识图谱构建 + 可视化</span><span class="en">Knowledge graph + visualization</span></td><td><span class="phase-depth depth-algo"><span class="zh">算法</span><span class="en">Algo</span></span></td></tr>
+        <tr><td><code>P8</code></td><td>8/15–9/12</td><td><span class="zh">GraphRAG 检索 + 学习路径</span><span class="en">GraphRAG retrieval + learning path</span></td><td><span class="phase-depth depth-algo"><span class="zh">算法</span><span class="en">Algo</span></span></td></tr>
+        <tr><td><code>P9</code></td><td>9/12–10/17</td><td><span class="zh">学习科学引擎</span><span class="en">Learning-science engine</span></td><td><span class="phase-depth depth-domain"><span class="zh">领域</span><span class="en">Domain</span></span></td></tr>
+        <tr><td><code>P10</code></td><td>10/17–11/21</td><td>Agent + Tools + MCP</td><td><span class="phase-depth depth-frontier"><span class="zh">前沿</span><span class="en">Frontier</span></span></td></tr>
+        <tr><td><code>P11</code></td><td>11/21–12/12</td><td><span class="zh">性能 / 可靠性 / 安全</span><span class="en">Performance / reliability / security</span></td><td><span class="phase-depth depth-eng"><span class="zh">工程</span><span class="en">Eng</span></span></td></tr>
+        <tr><td><code>P12</code></td><td>12/12–1/16</td><td><span class="zh">测试 / Docker / CI-CD / 监控</span><span class="en">Testing / Docker / CI-CD / monitoring</span></td><td><span class="phase-depth depth-eng"><span class="zh">工程</span><span class="en">Eng</span></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <strong><span class="zh">三个不可跳过的原则：</span><span class="en">Three principles you can't skip: </span></strong>
+    <span class="zh">① P6 度量基线先行 —— 没有对照组，"更好"无从证明。② 每阶段收尾写一篇 ADR —— 最低成本、最高"资深感"的文档。③ 不必等全做完 —— P9 结束（约 10 月）就把 README + 架构图 + KG 可视化 demo 推上 GitHub。</span>
+    <span class="en">① Baseline first in P6 — without a control group, "better" can't be proven. ② Write one ADR at the end of every phase — the lowest-cost, highest-signal doc of seniority. ③ Don't wait for everything — push README + architecture diagram + KG viz demo to GitHub right after P9 (~October).</span>
+  </div>
+
+  <footer>
+    EduPrep Roadmap · 2026-06-20<br>
+    <span class="zh">深度来自"证明你比默认方案做得更好"，而非"做得更多"。</span>
+    <span class="en">Depth comes from "proving you do better than the default", not from "doing more".</span>
+  </footer>
+
+</div>
+</body>
+</html>

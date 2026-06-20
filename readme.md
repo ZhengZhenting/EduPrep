@@ -1,37 +1,70 @@
+<div align="center">
+
 # EduPrep
 
-An AI-powered learning platform for international students in Germany. Reduces language barriers through a structured **Preview → Learn → Review** cycle.
+**English** · [中文](./README.zh.md)
+
+**An AI learning system for international students in Germany.**
+Not just a tool that chats with PDFs — it builds a **knowledge graph** for every course, **tracks your mastery** of each concept, and schedules your **Preview → Learn → Review** along the forgetting curve.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![Claude](https://img.shields.io/badge/LLM-Claude-D97757)
+![Status](https://img.shields.io/badge/status-active%20development-brightgreen)
+
+[Demo](#demo) · [What Makes It Different](#what-makes-eduprep-different) · [Architecture](#architecture) · [Tech Stack](#tech-stack) · [Roadmap](#roadmap--where-its-heading) · [Docs](./docs)
+
+</div>
 
 ---
+
 ## Demo
+
 [![Demo Video](https://img.youtube.com/vi/EDPW8Nq5G64/0.jpg)](https://youtu.be/EDPW8Nq5G64)
+
+---
+
+## What Makes EduPrep Different
+
+Most "AI study tools" stop at *retrieval-augmented chat over a single document*. EduPrep is built around three ideas that turn isolated PDFs into a **living model of what a student knows**:
+
+| Principle | What it means |
+|---|---|
+| 🕸️ **Knowledge-graph-driven** | Concepts are extracted from every PDF and stitched into a **course-level knowledge graph** — with prerequisite, related, and German-term-equivalence edges. A concept that appears in week 3 and week 9 is *one node*, not two. |
+| 🎯 **Adaptive & personalised** | A per-concept **learner model** tracks your mastery from quiz results. Quizzes prioritise your weak spots; difficulty adapts to you. |
+| 🔁 **A truly closed learning loop** | Preview → Learn → Review isn't three isolated tabs. Every session updates the knowledge graph + mastery model, so the *next* preview, quiz, and review change accordingly. |
+
+> **The unit of learning is a course, not a PDF.** Over a semester, EduPrep grows each course into a complete, mastery-annotated map of everything you've studied.
 
 ---
 
 ## Features
 
-### Preview
-Upload a German lecture PDF and automatically receive a bilingual summary (German + Chinese), a key vocabulary list with translations, and a Mermaid structure diagram of the lecture.
+> The features below are shipping today. Each is being upgraded along the [roadmap](#roadmap--where-its-heading) — e.g. the Preview mind-map is evolving into the full knowledge graph, and Learn is becoming an Agent.
 
-### Learn
-Ask questions about the lecture in natural language. Answers are grounded in the PDF via hybrid RAG retrieval. When the PDF content score falls below the relevance threshold, the system automatically supplements with live web search via Tavily and labels the answer source (`pdf` / `pdf+web`). Conversation history is compressed and persisted per PDF.
+### 📖 Preview
+Upload a German lecture PDF and automatically receive a **bilingual summary (German + Chinese)**, a key vocabulary list with translations, and a Mermaid structure diagram of the lecture.
 
-### Quiz
-Generate personalised multiple-choice questions from the lecture content. The system reads tracked weak concepts from memory and prioritises them in question generation. Quiz results and scores are persisted to PostgreSQL.
+### 💬 Learn
+Ask questions in natural language. Answers are grounded in the PDF via **hybrid RAG retrieval** (BM25 + vector + RRF fusion). When PDF relevance falls below threshold, the system supplements with **live web search (Tavily)** and labels the source (`pdf` / `pdf+web`). Conversation history is compressed and persisted per PDF.
+
+### 📝 Quiz
+Generate **personalised** multiple-choice questions from the lecture. The system reads tracked weak concepts from memory and prioritises them. Scores are persisted to PostgreSQL.
 
 ---
 
 ## Architecture
 
 ```
-React SPA (Auth → Courses → PDF → Learn/Preview/Quiz)
+React SPA (Auth → Courses → PDF → Preview / Learn / Quiz)
         |
 FastAPI Backend (JWT-protected endpoints)
         |
   ┌─────┴──────────────────────┐
   |                            |
 Hybrid RAG Pipeline        Memory System
-  |                            |
   ├─ Vector Search (ChromaDB)  ├─ Conversation Memory (PostgreSQL)
   ├─ BM25 Keyword Search       └─ Quiz Progress (PostgreSQL)
   └─ RRF Fusion
@@ -43,54 +76,48 @@ Hybrid RAG Pipeline        Memory System
   LangFuse v4 (full LLM call tracing)
 ```
 
+📐 Detailed design docs live in [`docs/architecture/`](./docs/architecture) — including the upcoming [knowledge-graph schema](./docs/architecture/knowledge-graph-schema.md).
+
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 18, Vite, inline styles |
-| Backend | FastAPI, Python 3.11 |
-| LLM | Claude API — claude-sonnet-4-5 |
-| Embeddings | Ollama — nomic-embed-text (local) |
-| RAG | LangChain + ChromaDB + BM25 (rank-bm25) |
-| Retrieval Fusion | Reciprocal Rank Fusion (RRF) |
-| Web Search | Tavily API |
-| Memory | PostgreSQL — memory + quiz_progress tables |
-| Database | PostgreSQL + SQLAlchemy + Alembic |
-| Auth | JWT (python-jose) + bcrypt |
-| Observability | LangFuse v4 + Loguru |
+| Layer | Now (shipping) | Planned (roadmap) |
+|---|---|---|
+| Frontend | React 18, Vite, TanStack Router + Query, Tailwind + shadcn/ui | Knowledge-graph viz (react-flow / cytoscape.js) |
+| Backend | FastAPI, Python 3.11 | Celery + Redis async workers |
+| LLM | Claude API — `claude-sonnet-4-5` | Model tiering — `claude-opus-4-8` (Agent) / `claude-sonnet-4-6` (tools) |
+| Embeddings | Ollama — `nomic-embed-text` (local) | — |
+| RAG | LangChain + ChromaDB + BM25 + RRF | **GraphRAG** (graph-expanded retrieval) |
+| Agent | Plain tool functions | **LangGraph** orchestration + **MCP server** |
+| Learning science | weak-concept tracking | **Knowledge tracing (BKT)** + **spaced repetition (FSRS)** + adaptive quizzing |
+| Web search | Tavily API | — |
+| Database | PostgreSQL + SQLAlchemy + Alembic | Course-level concept graph tables |
+| Auth | JWT (python-jose) + bcrypt | — |
+| Observability | LangFuse v4 + Loguru | Prometheus + Grafana + Jaeger |
+| Eval | — | Golden dataset + retrieval/answer metrics |
 
 ---
 
 ## Getting Started
 
 ### Prerequisites
-
-- Python 3.10+
-- Node.js 18+
-- PostgreSQL
-- [Ollama](https://ollama.com)
+- Python 3.10+ · Node.js 18+ · PostgreSQL · [Ollama](https://ollama.com)
 
 ### 1. Pull embedding model
-
 ```bash
 ollama pull nomic-embed-text
 ```
 
-### 2. Backend setup
-
+### 2. Backend
 ```bash
 cd backend
 python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # macOS/Linux
-
+venv\Scripts\activate         # Windows  ·  source venv/bin/activate on macOS/Linux
 pip install -r requirements.txt
 ```
 
 Create `backend/.env`:
-
 ```env
 ANTHROPIC_API_KEY=sk-ant-...
 TAVILY_API_KEY=tvly-...
@@ -101,26 +128,17 @@ LANGFUSE_SECRET_KEY=sk-lf-...
 LANGFUSE_HOST=https://cloud.langfuse.com
 ```
 
-Initialise the database (run once):
-
+Initialise the DB (run once) and start the server:
 ```bash
 python init_db.py
+uvicorn main:app --reload      # API docs: http://localhost:8000/docs
 ```
 
-Start the server:
-
-```bash
-uvicorn main:app --reload
-# API docs: http://localhost:8000/docs
-```
-
-### 3. Frontend setup
-
+### 3. Frontend
 ```bash
 cd frontend
 npm install
-npm run dev
-# App: http://localhost:5173
+npm run dev                    # App: http://localhost:5173
 ```
 
 ---
@@ -131,24 +149,14 @@ All endpoints except `/auth/*` require `Authorization: Bearer <token>`.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/auth/register` | Create account |
-| POST | `/auth/login` | Login, returns access + refresh tokens |
-| POST | `/auth/refresh` | Exchange refresh token for new access token |
-| POST | `/courses` | Create course |
-| GET | `/courses` | List user's courses |
-| GET | `/courses/{id}` | Course detail + PDF list |
-| PATCH | `/courses/{id}` | Rename course |
-| DELETE | `/courses/{id}` | Delete course (cascade) |
-| POST | `/upload` | Upload PDF → chunk → embed → ChromaDB |
-| DELETE | `/pdfs/{id}` | Delete PDF + ChromaDB collection |
+| POST | `/auth/register` · `/auth/login` · `/auth/refresh` | Account + JWT token lifecycle |
+| POST/GET/PATCH/DELETE | `/courses` · `/courses/{id}` | Course CRUD (per-user, ownership-checked) |
+| POST/DELETE | `/upload` · `/pdfs/{id}` | PDF → chunk → embed → ChromaDB; delete + cleanup |
 | POST | `/preview` | Bilingual summary + vocabulary + Mermaid diagram |
 | POST | `/ask` | Hybrid RAG Q&A with optional web supplement |
 | GET | `/message/{filename}` | Load conversation history |
-| POST | `/quiz` | Generate personalised quiz questions |
-| POST | `/quiz/result` | Save quiz score |
-| POST | `/notes` | Save note |
-| GET | `/notes/{filename}` | Load notes |
-| DELETE | `/notes/{id}` | Delete note |
+| POST | `/quiz` · `/quiz/result` | Generate personalised quiz · save score |
+| POST/GET/DELETE | `/notes` · `/notes/{filename}` · `/notes/{id}` | Notes CRUD |
 
 ---
 
@@ -163,19 +171,22 @@ eduprep/
 │   ├── pdf_processor.py    # PyPDFLoader, chunking (800 chars, 300 overlap)
 │   ├── memory.py           # Conversation memory + quiz progress (PostgreSQL)
 │   ├── tools.py            # Plain functions: search_web, generate_mermaid_chart
-│   ├── models.py           # SQLAlchemy ORM — 7 tables
+│   ├── models.py           # SQLAlchemy ORM — 7 tables (+ knowledge-graph tables planned)
 │   ├── database.py         # PostgreSQL connection
 │   ├── observability.py    # LangFuse + Loguru initialisation
-│   ├── init_db.py          # One-time DB + default user setup
-│   ├── alembic/            # Migration scripts
-│   └── .env                # Environment variables (gitignored)
-├── frontend/
-│   └── src/
-│       ├── App.jsx          # React SPA — auth, sidebar, 3-view navigation
-│       └── AnswerRenderer.jsx  # Renders Mermaid / LaTeX / code / text
+│   ├── eval/               # AI evaluation harness (planned P6)
+│   └── alembic/            # Migration scripts
+├── frontend/src/
+│   ├── routes/             # login, register, dashboard, courses, workspace
+│   ├── lib/                # api.ts (axios + JWT), auth.tsx, use-auth.ts
+│   └── components/         # ui/ (shadcn) + workspace/ (Preview/Learn/Quiz/Notes/Mermaid)
 ├── docs/
-│   └── architecture/
-│       └── er_diagram.svg
+│   ├── architecture/       # knowledge-graph-schema.md, ER diagram, design docs
+│   ├── adr/                # Architecture Decision Records
+│   ├── evaluation/         # Eval baselines + benchmark reports
+│   ├── research/           # User personas, journey maps, competitor analysis
+│   ├── roadmap/            # eduprep_roadmap.html (bilingual interactive roadmap)
+│   └── blog/               # Technical write-ups
 ├── CLAUDE.md
 └── README.md
 ```
@@ -184,46 +195,53 @@ eduprep/
 
 ## Key Design Decisions
 
-**Hybrid retrieval over vector-only** — BM25 handles exact keyword matches (e.g. German technical terms) that semantic search misses. RRF fusion (`score = Σ 1/(60+rank)`) combines both rankings without requiring score normalisation.
+Full rationale is recorded as [ADRs](./docs/adr). Highlights:
 
-**Score-based routing** — Cosine distance threshold (0.9) decides whether to call Tavily. Deterministic and tunable; avoids an extra LLM classification call.
-
-**Two-step Preview prompting** — Summary JSON and Mermaid diagram are generated in separate Claude calls. Mixing structured JSON output with Mermaid syntax in a single prompt causes format collisions.
-
-**Memory compression** — Conversation history is compressed by Claude every 6 turns into a ≤200-character summary, keeping context window usage bounded across long sessions.
-
-**Local embeddings** — Ollama/nomic-embed-text runs locally. Only LLM inference and web search make external API calls.
+- **Hybrid retrieval over vector-only** — BM25 catches exact German technical terms that semantic search misses; RRF fusion (`Σ 1/(60+rank)`) merges rankings without score normalisation.
+- **Score-based routing** — a cosine-distance threshold (0.9) decides whether to call Tavily. Deterministic, tunable, avoids an extra LLM classification call.
+- **Two-step Preview prompting** — summary JSON and Mermaid diagram are generated separately to avoid format collisions.
+- **Course-level knowledge layer** — concepts/mastery are modelled at the course level (not per-PDF), because the real unit of learning spans many documents. See [knowledge-graph-schema.md](./docs/architecture/knowledge-graph-schema.md).
+- **Local embeddings** — Ollama runs locally; only LLM inference and web search leave the machine.
 
 ---
 
-## Roadmap
+## Roadmap — Where It's Heading
+
+EduPrep is under **active, iterative development**. The path from "RAG chat app" to "knowledge-graph-driven adaptive learning system" is broken into focused phases — each shipping working features **and** its own documentation.
 
 | Phase | Scope | Status |
 |---|---|---|
-| P1 | Tool layer, hybrid RAG, dual-source Q&A | Complete |
-| P2 | PostgreSQL, course + PDF management, conversation persistence | Complete |
-| P3 | LangFuse observability, Loguru structured logging | Complete |
-| P4 | JWT auth, frontend redesign, memory system, personalised quiz | Complete |
-| P5 | Redis cache, rate limiting, circuit breaker, security hardening | Planned |
-| P6 | pytest unit + integration tests, AI golden dataset, Locust load tests | Planned |
-| P7 | Docker + docker-compose, GitHub Actions CI/CD, Celery async, Tailwind | Planned |
+| P1–P3 | Tool layer · hybrid RAG · PostgreSQL · course/PDF management · LangFuse observability | ✅ Complete |
+| P4–P5 | JWT auth · memory system · personalised quiz · TanStack Router + shadcn/ui redesign | ✅ Complete |
+| **P6** | Evaluation baseline (golden dataset + metrics) · docs foundation | 🔜 Next |
+| **P7** | **Knowledge graph** construction + visualization (course-level concept network) | 📋 Planned |
+| **P8** | **GraphRAG** retrieval + learning-path generation | 📋 Planned |
+| **P9** | **Learning-science engine** — knowledge tracing (BKT) + spaced repetition (FSRS) + adaptive quizzing | 📋 Planned |
+| **P10** | **Agent + Tools + MCP** — LangGraph orchestration, EduPrep as an MCP server | 📋 Planned |
+| P11 | Performance / reliability / security hardening (Redis cache, rate limiting, circuit breaker) | 📋 Planned |
+| P12 | Testing · Docker · CI/CD · Prometheus + Grafana + Jaeger | 📋 Planned |
+
+📍 **Full interactive bilingual roadmap:** [`docs/roadmap/eduprep_roadmap.html`](./docs/roadmap/eduprep_roadmap.html)
 
 ---
 
-## Environment Variables
+## Documentation
 
-| Variable | Description |
+| Area | Location |
 |---|---|
-| `ANTHROPIC_API_KEY` | Claude API key |
-| `TAVILY_API_KEY` | Tavily Search API key |
-| `POSTGRESQL_PASSWORD` | PostgreSQL password |
-| `JWT_SECRET_KEY` | 64-char random hex for JWT signing |
-| `LANGFUSE_PUBLIC_KEY` | LangFuse project public key |
-| `LANGFUSE_SECRET_KEY` | LangFuse project secret key |
-| `LANGFUSE_HOST` | LangFuse host URL |
+| Architecture & schema | [`docs/architecture/`](./docs/architecture) |
+| Architecture Decision Records | [`docs/adr/`](./docs/adr) |
+| Evaluation & benchmarks | [`docs/evaluation/`](./docs/evaluation) |
+| User research | [`docs/research/`](./docs/research) |
+| Roadmap | [`docs/roadmap/`](./docs/roadmap) |
+| Technical blog | [`docs/blog/`](./docs/blog) |
 
 ---
+
+## Contributing
+
+Contributions are welcome. Please report security issues per [`SECURITY.md`](./SECURITY.md).
 
 ## License
 
-MIT
+[MIT](./LICENSE)
