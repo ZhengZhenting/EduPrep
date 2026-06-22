@@ -48,7 +48,7 @@ Most "AI study tools" stop at *retrieval-augmented chat over a single document*.
 Upload a German lecture PDF and automatically receive a **bilingual summary (German + Chinese)**, a key vocabulary list with translations, and a Mermaid structure diagram of the lecture.
 
 ### 💬 Learn
-Ask questions in natural language. Answers are grounded in the PDF via **hybrid RAG retrieval** (BM25 + vector + RRF fusion). When PDF relevance falls below threshold, the system supplements with **live web search (Tavily)** and labels the source (`pdf` / `pdf+web`). Conversation history is compressed and persisted per PDF.
+Ask questions in natural language. Answers are grounded in the PDF via **hybrid RAG retrieval** (BM25 + vector + RRF fusion). The **LLM itself decides** (via Anthropic tool use) whether the lecture is enough or a **live web search (Tavily)** is needed — when it searches, the PDF answer (with page numbers) and the web supplement (with source URLs) are shown as **two separate, clearly-sourced parts** (`pdf` / `pdf+web`). Conversation history is compressed and persisted per PDF.
 
 ### 📝 Quiz
 Generate **personalised** multiple-choice questions from the lecture. The system reads tracked weak concepts from memory and prioritises them. Scores are persisted to PostgreSQL.
@@ -69,9 +69,11 @@ Hybrid RAG Pipeline        Memory System
   ├─ BM25 Keyword Search       └─ Quiz Progress (PostgreSQL)
   └─ RRF Fusion
         |
-  Score Routing (threshold 0.9)
-  ├─ score < 0.9 → Claude API (PDF answer)
-  └─ score ≥ 0.9 → Tavily Search → Claude API (PDF + web supplement)
+  Claude API (PDF answer, always)
+        |
+  LLM tool-use decision (Anthropic tool_choice=auto)
+  ├─ lecture sufficient → PDF answer only
+  └─ insufficient → Tavily Search → Claude API (separate web supplement)
         |
   LangFuse v4 (full LLM call tracing)
 ```
@@ -88,7 +90,7 @@ Hybrid RAG Pipeline        Memory System
 | Backend | FastAPI, Python 3.11 | Celery + Redis async workers |
 | LLM | Claude API — `claude-sonnet-4-5` | Model tiering — `claude-opus-4-8` (Agent) / `claude-sonnet-4-6` (tools) |
 | Embeddings | Ollama — `nomic-embed-text` (local) | — |
-| RAG | LangChain + ChromaDB + BM25 + RRF | **GraphRAG** (graph-expanded retrieval) |
+| RAG | LangChain + ChromaDB + BM25 + RRF; semantic chunking (SemanticChunker) | **GraphRAG** (graph-expanded retrieval) |
 | Agent | Plain tool functions | **LangGraph** orchestration + **MCP server** |
 | Learning science | weak-concept tracking | **Knowledge tracing (BKT)** + **spaced repetition (FSRS)** + adaptive quizzing |
 | Web search | Tavily API | — |
@@ -157,6 +159,7 @@ All endpoints except `/auth/*` require `Authorization: Bearer <token>`.
 | GET | `/message/{filename}` | Load conversation history |
 | POST | `/quiz` · `/quiz/result` | Generate personalised quiz · save score |
 | POST/GET/DELETE | `/notes` · `/notes/{filename}` · `/notes/{id}` | Notes CRUD |
+| GET | `/me/stats` | Gamification stats (days active, level, xp) derived from existing data |
 
 ---
 
@@ -168,7 +171,7 @@ eduprep/
 │   ├── main.py             # FastAPI app — all endpoints
 │   ├── auth.py             # JWT auth — hash, verify, token creation
 │   ├── rag.py              # ChromaDB + BM25 hybrid search + RRF
-│   ├── pdf_processor.py    # PyPDFLoader, chunking (800 chars, 300 overlap)
+│   ├── pdf_processor.py    # PyPDFLoader + SemanticChunker (percentile 90) + 1100-char guard split
 │   ├── memory.py           # Conversation memory + quiz progress (PostgreSQL)
 │   ├── tools.py            # Plain functions: search_web, generate_mermaid_chart
 │   ├── models.py           # SQLAlchemy ORM — 7 tables (+ knowledge-graph tables planned)
@@ -198,7 +201,8 @@ eduprep/
 Full rationale is recorded as [ADRs](./docs/adr). Highlights:
 
 - **Hybrid retrieval over vector-only** — BM25 catches exact German technical terms that semantic search misses; RRF fusion (`Σ 1/(60+rank)`) merges rankings without score normalisation.
-- **Score-based routing** — a cosine-distance threshold (0.9) decides whether to call Tavily. Deterministic, tunable, avoids an extra LLM classification call.
+- **Semantic chunking** — chunks break on embedding-similarity shifts (SemanticChunker) instead of a fixed character count, keeping each chunk topically coherent; an 1100-char guard split caps over-long chunks.
+- **LLM-decided web search** — instead of a fixed cosine threshold, the model decides via Anthropic tool use whether the lecture suffices or Tavily is needed (defaults to trusting the lecture, capped at one call). PDF and web answers stay separately sourced (page numbers vs. URLs).
 - **Two-step Preview prompting** — summary JSON and Mermaid diagram are generated separately to avoid format collisions.
 - **Course-level knowledge layer** — concepts/mastery are modelled at the course level (not per-PDF), because the real unit of learning spans many documents. See [knowledge-graph-schema.md](./docs/architecture/knowledge-graph-schema.md).
 - **Local embeddings** — Ollama runs locally; only LLM inference and web search leave the machine.

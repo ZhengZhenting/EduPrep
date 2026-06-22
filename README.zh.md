@@ -48,7 +48,7 @@
 上传德语讲义 PDF，自动获得**双语摘要（德语 + 中文）**、带翻译的核心词汇表，以及讲义的 Mermaid 结构图。
 
 ### 💬 学习 Learn
-用自然语言提问。回答通过**混合 RAG 检索**（BM25 + 向量 + RRF 融合）锚定在 PDF 内容上。当 PDF 相关度低于阈值时，系统用 **Tavily 实时联网搜索**补充，并标注来源（`pdf` / `pdf+web`）。对话历史按 PDF 压缩并持久化。
+用自然语言提问。回答通过**混合 RAG 检索**（BM25 + 向量 + RRF 融合）锚定在 PDF 内容上。**由 LLM 自己判断**（通过 Anthropic 工具调用）讲义是否足够、是否需要 **Tavily 实时联网搜索** —— 一旦联网，PDF 回答（带页码）与联网补充（带来源网址）会**分成两部分、各自标注来源**（`pdf` / `pdf+web`）。对话历史按 PDF 压缩并持久化。
 
 ### 📝 测验 Quiz
 从讲义生成**个性化**选择题。系统从记忆中读取追踪到的薄弱概念并优先出题。成绩持久化到 PostgreSQL。
@@ -69,9 +69,11 @@ FastAPI 后端（JWT 保护的端点）
   ├─ BM25 关键词检索           └─ 测验进度 (PostgreSQL)
   └─ RRF 融合
         |
-  分数路由（阈值 0.9）
-  ├─ score < 0.9 → Claude API（PDF 回答）
-  └─ score ≥ 0.9 → Tavily 搜索 → Claude API（PDF + 联网补充）
+  Claude API（始终生成 PDF 回答）
+        |
+  LLM 工具调用决策（Anthropic tool_choice=auto）
+  ├─ 讲义足够 → 仅 PDF 回答
+  └─ 不足 → Tavily 搜索 → Claude API（独立的联网补充）
         |
   LangFuse v4（全链路 LLM 调用追踪）
 ```
@@ -88,7 +90,7 @@ FastAPI 后端（JWT 保护的端点）
 | 后端 | FastAPI、Python 3.11 | Celery + Redis 异步任务 |
 | LLM | Claude API — `claude-sonnet-4-5` | 模型分层 — `claude-opus-4-8`（Agent）/ `claude-sonnet-4-6`（工具） |
 | 嵌入 | Ollama — `nomic-embed-text`（本地） | — |
-| RAG | LangChain + ChromaDB + BM25 + RRF | **GraphRAG**（图谱扩展检索） |
+| RAG | LangChain + ChromaDB + BM25 + RRF；语义切割（SemanticChunker） | **GraphRAG**（图谱扩展检索） |
 | Agent | 普通工具函数 | **LangGraph** 编排 + **MCP server** |
 | 学习科学 | 薄弱概念追踪 | **知识追踪 (BKT)** + **间隔重复 (FSRS)** + 自适应出题 |
 | 联网搜索 | Tavily API | — |
@@ -157,6 +159,7 @@ npm run dev                    # 应用: http://localhost:5173
 | GET | `/message/{filename}` | 加载对话历史 |
 | POST | `/quiz` · `/quiz/result` | 生成个性化测验 · 保存成绩 |
 | POST/GET/DELETE | `/notes` · `/notes/{filename}` · `/notes/{id}` | 笔记 CRUD |
+| GET | `/me/stats` | 游戏化数据（活跃天数、等级、经验值），从现有数据现算 |
 
 ---
 
@@ -168,7 +171,7 @@ eduprep/
 │   ├── main.py             # FastAPI 应用 — 所有端点
 │   ├── auth.py             # JWT 认证 — 哈希、校验、令牌生成
 │   ├── rag.py              # ChromaDB + BM25 混合检索 + RRF
-│   ├── pdf_processor.py    # PyPDFLoader, 切块 (800 字符, 300 重叠)
+│   ├── pdf_processor.py    # PyPDFLoader + SemanticChunker (percentile 90) + 1100 字符兜底拆分
 │   ├── memory.py           # 对话记忆 + 测验进度 (PostgreSQL)
 │   ├── tools.py            # 普通函数: search_web, generate_mermaid_chart
 │   ├── models.py           # SQLAlchemy ORM — 7 张表（+ 规划中的知识图谱表）
@@ -198,7 +201,8 @@ eduprep/
 完整推理记录在 [ADR](./docs/adr) 中。要点：
 
 - **混合检索优于纯向量** —— BM25 能命中语义检索漏掉的德语专业术语；RRF 融合（`Σ 1/(60+rank)`）无需分数归一化即可合并排名。
-- **基于分数的路由** —— 用 cosine 距离阈值（0.9）决定是否调用 Tavily。确定性强、可调，省去一次额外的 LLM 分类调用。
+- **语义切割** —— 切块按 embedding 相似度的转折点断开（SemanticChunker），而非固定字符数，让每块主题更完整；并用 1100 字符兜底拆分限制超长块。
+- **LLM 决定是否联网** —— 不再用固定 cosine 阈值，而是让模型通过 Anthropic 工具调用自行判断讲义是否足够、是否需要 Tavily（默认信任讲义，每次最多一次调用）。PDF 与联网回答各自独立标注来源（页码 vs. 网址）。
 - **两步式 Preview prompting** —— 摘要 JSON 与 Mermaid 图分开生成，避免格式冲突。
 - **课程级知识层** —— 概念/掌握度建模在课程级（而非单份 PDF），因为学习的真实单位跨越多份文档。详见 [knowledge-graph-schema.md](./docs/architecture/knowledge-graph-schema.md)。
 - **本地嵌入** —— Ollama 本地运行；只有 LLM 推理和联网搜索会离开本机。
