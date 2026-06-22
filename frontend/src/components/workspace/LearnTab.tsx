@@ -8,19 +8,20 @@ import { toast } from "sonner";
 // ── Source parsing ────────────────────────────────────────────────────────────
 // Live API response:  sources = { pages: [3, 7], urls: ["https://..."] }
 // History from DB:    sources = ["https://..."]  (only URLs saved)
-function parseSources(sources: any): { pages: number[]; urls: string[] } {
-  if (!sources) return { pages: [], urls: [] };
+function parseSources(sources: any): { pages: number[]; urls: string[]; web_supplement: string } {
+  if (!sources) return { pages: [], urls: [], web_supplement: "" };
   if (Array.isArray(sources)) {
-    // From DB: array of URL strings
-    return { pages: [], urls: sources.filter(Boolean) };
+    // From DB (legacy): array of URL strings
+    return { pages: [], urls: sources.filter(Boolean), web_supplement: "" };
   }
   if (typeof sources === "object") {
     return {
       pages: Array.isArray(sources.pages) ? sources.pages : [],
       urls: Array.isArray(sources.urls) ? sources.urls.filter(Boolean) : [],
+      web_supplement: typeof sources.web_supplement === "string" ? sources.web_supplement : "",
     };
   }
-  return { pages: [], urls: [] };
+  return { pages: [], urls: [], web_supplement: "" };
 }
 
 function truncateUrl(url: string): string {
@@ -33,39 +34,37 @@ function truncateUrl(url: string): string {
   }
 }
 
-// ── Source footer shown at the bottom of each assistant message ───────────────
-function SourceFooter({ sources }: { sources: any }) {
-  const { pages, urls } = parseSources(sources);
-  if (pages.length === 0 && urls.length === 0) return null;
-
+// ── Page numbers footer (lecture / PDF part) ──────────────────────────────────
+function PagesFooter({ sources }: { sources: any }) {
+  const { pages } = parseSources(sources);
+  if (pages.length === 0) return null;
   return (
     <div className="mt-2.5 pt-2 border-t border-black/[0.08] flex flex-wrap items-center gap-1.5">
-      {pages.length > 0 && (
-        <div className="flex items-center gap-1 flex-wrap">
-          <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
-          {pages.map((p) => (
-            <span key={p}
-                  className="rounded bg-black/[0.05] px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
-              p.{p}
-            </span>
-          ))}
-        </div>
-      )}
-      {pages.length > 0 && urls.length > 0 && (
-        <span className="text-black/20 text-xs">·</span>
-      )}
-      {urls.length > 0 && (
-        <div className="flex items-center gap-1 flex-wrap">
-          <Globe className="h-3 w-3 text-muted-foreground shrink-0" />
-          {urls.map((url, i) => (
-            <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-               className="inline-flex items-center gap-0.5 rounded bg-black/[0.05] px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:bg-black/[0.08] transition max-w-[220px]">
-              <ExternalLink className="h-2.5 w-2.5 shrink-0" />
-              <span className="truncate">{truncateUrl(url)}</span>
-            </a>
-          ))}
-        </div>
-      )}
+      <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
+      {pages.map((p) => (
+        <span key={p}
+              className="rounded bg-black/[0.05] px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+          p.{p}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ── Source URLs footer (web supplement part) ──────────────────────────────────
+function UrlsFooter({ sources }: { sources: any }) {
+  const { urls } = parseSources(sources);
+  if (urls.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <Globe className="h-3 w-3 text-muted-foreground shrink-0" />
+      {urls.map((url, i) => (
+        <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+           className="inline-flex items-center gap-0.5 rounded bg-black/[0.05] px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground hover:bg-black/[0.08] transition max-w-[220px]">
+          <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+          <span className="truncate">{truncateUrl(url)}</span>
+        </a>
+      ))}
     </div>
   );
 }
@@ -97,9 +96,9 @@ export function LearnTab({ filename, courseId, onActivity }: { filename: string;
     setSending(true);
     try {
       const res = await AIAPI.ask({ filename, course_id: courseId, question: q, history: messages });
-      const answer = res.answer ?? res.content ?? res.message ?? JSON.stringify(res);
-      const sources = res.sources ?? res.source;
-      const source_type = res.source_type ?? (sources ? "pdf+web" : "pdf");
+      const answer = res.pdf_answer ?? res.answer ?? res.content ?? JSON.stringify(res);
+      const sources = res.sources; // contains pages / urls / web_supplement
+      const source_type = res.source_type ?? "pdf";
       setMessages((m) => [...m, { role: "assistant", content: answer, sources, source_type }]);
       onActivity?.();
     } catch (e: any) {
@@ -110,8 +109,10 @@ export function LearnTab({ filename, courseId, onActivity }: { filename: string;
     }
   };
 
-  const saveAnswer = async (content: string) => {
-    try { await NotesAPI.create({ filename, course_id: courseId, type: "answer", content }); toast.success("Saved to notes"); }
+  const saveAnswer = async (content: string, sources?: any) => {
+    const { web_supplement } = parseSources(sources);
+    const full = web_supplement ? `${content}\n\n**网络补充：**\n${web_supplement}` : content;
+    try { await NotesAPI.create({ filename, course_id: courseId, type: "answer", content: full }); toast.success("Saved to notes"); }
     catch { toast.error("Save failed"); }
   };
 
@@ -142,8 +143,25 @@ export function LearnTab({ filename, courseId, onActivity }: { filename: string;
 
                 {m.role === "assistant" && (
                   <>
-                    {/* Source footer: page numbers + web URLs */}
-                    <SourceFooter sources={m.sources} />
+                    {/* Part 1: lecture answer page numbers */}
+                    <PagesFooter sources={m.sources} />
+
+                    {/* Part 2: web supplement (only when present) */}
+                    {(() => {
+                      const { web_supplement } = parseSources(m.sources);
+                      if (!web_supplement) return null;
+                      return (
+                        <div className="mt-3 pt-3 border-t border-black/[0.08]">
+                          <div className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            <Globe className="h-3 w-3" /> 网络补充
+                          </div>
+                          <div className="prose prose-sm max-w-none">
+                            <ReactMarkdown>{web_supplement}</ReactMarkdown>
+                          </div>
+                          <UrlsFooter sources={m.sources} />
+                        </div>
+                      );
+                    })()}
 
                     {/* Source type badge + Save button */}
                     <div className="mt-2 flex items-center justify-between gap-3">
@@ -153,7 +171,7 @@ export function LearnTab({ filename, courseId, onActivity }: { filename: string;
                           {m.source_type}
                         </span>
                       )}
-                      <button onClick={() => saveAnswer(m.content)}
+                      <button onClick={() => saveAnswer(m.content, m.sources)}
                               className="opacity-0 group-hover:opacity-100 transition text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 ml-auto">
                         <BookmarkPlus className="h-3 w-3" /> Save
                       </button>

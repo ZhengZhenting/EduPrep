@@ -125,12 +125,48 @@ export const CoursesAPI = {
   remove: (id: number) => api.delete(`/courses/${id}`).then((r) => r.data),
 };
 
+// Backend /upload returns immediately, then processes in a background thread.
+// GET /upload/status/{filename} returns this shape while/after processing.
+export type UploadStatus = {
+  status: "processing" | "done" | "error";
+  progress: number;
+  chunks?: number;
+  pdf_file_id?: number;
+  message?: string;
+};
+
 export const PdfAPI = {
   upload: (file: File, courseId: number) => {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("course_id", String(courseId));
     return api.post("/upload", fd, { headers: { "Content-Type": "multipart/form-data" } }).then((r) => r.data);
+  },
+  status: (filename: string): Promise<UploadStatus> =>
+    api.get(`/upload/status/${encodeURIComponent(filename)}`).then((r) => r.data),
+  // Upload, then poll status until background processing is "done".
+  // Throws on "error", or after timeoutMs (so it can never poll forever).
+  uploadAndWait: async (
+    file: File,
+    courseId: number,
+    opts?: { intervalMs?: number; timeoutMs?: number },
+  ): Promise<UploadStatus> => {
+    const intervalMs = opts?.intervalMs ?? 1500;
+    const timeoutMs = opts?.timeoutMs ?? 5 * 60 * 1000; // 5 min cap
+    await PdfAPI.upload(file, courseId);
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await new Promise((res) => setTimeout(res, intervalMs));
+      let s: UploadStatus;
+      try {
+        s = await PdfAPI.status(file.name);
+      } catch {
+        continue; // status row not ready yet / transient — keep polling until deadline
+      }
+      if (s.status === "done") return s;
+      if (s.status === "error") throw new Error(s.message || "PDF processing failed");
+    }
+    throw new Error("Upload timed out while processing");
   },
   remove: (id: number) => api.delete(`/pdfs/${id}`).then((r) => r.data),
 };

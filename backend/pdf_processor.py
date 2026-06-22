@@ -1,5 +1,7 @@
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_experimental.text_splitter import SemanticChunker
+from rag import get_embedding_function   # 复用检索同款 embedding 模型
 import tempfile
 import os 
 
@@ -19,17 +21,33 @@ def process_pdf(file_bytes: bytes, filename:str) -> list:
         loader = PyPDFLoader(temp_path)
         pages = loader.load()
 
-        # 用RecursiveCharacterTextSplitter切块
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=800, 
-            chunk_overlap=300, # overlap 37.5%，业界常用的经验比例是25%-40%
-            separators=["\n\n", "\n", ".", ""]) # 优先在段落、句子的边界处切割，保持语义完整
-        chunks = splitter.split_documents(pages) # 这里的输入是LangChain的Document对象列表，每个Document对象都有page_content和metadata属性
+        # sementic chunker 
+        semantic_splitter = SemanticChunker(
+            get_embedding_function(),
+            breakpoint_threshold_type="percentile",
+            breakpoint_threshold_amount=90,
+            min_chunk_size=400   
+        )
+        # chunking page to page (preseve page information)
+        semantic_chunks = semantic_splitter.split_documents(pages)
+        # for chunk over 1100 tokens, further split it to avoid exceeding vector database limits
+        guard_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=800,
+            chunk_overlap=150,
+            separators=["\n\n", "\n", "。", "!", "?", ". ", "! ", "? ", " ", ""]
+        )
+        chunks = []
+        for ch in semantic_chunks:
+            if len(ch.page_content) > 1100:
+                chunks.extend(guard_splitter.split_documents([ch]))
+            else:
+                chunks.append(ch)
+        # save metadata source information for each chunk
+        for chunk in chunks: 
+            chunk.metadata["source"] =filename
 
-        for chunk in chunks:
-            chunk.metadata["source"]=filename  # 在metadata中保留文件名信息，方便后续追踪来源
-
-        print(f"PDF processed: {len(pages)} pages split into {len(chunks)} chunks.")
+        print(f"PDF processed: {len(pages)} pages -> "
+              f"{len(semantic_chunks)} semantic chunks -> {len(chunks)} final chunks.")
         return chunks
     
     finally:

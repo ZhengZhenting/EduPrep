@@ -38,12 +38,14 @@ function CourseDetail() {
     setUploading(true);
     try {
       for (const f of Array.from(files)) {
-        await PdfAPI.upload(f, cid);
+        // Wait for background processing (chunking + embedding) to finish
+        // before claiming success — otherwise the PDF isn't queryable yet.
+        await PdfAPI.uploadAndWait(f, cid);
         toast.success(`Uploaded ${f.name}`);
       }
       await refresh();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || "Upload failed");
+      toast.error(e?.response?.data?.detail || e?.message || "Upload failed");
     } finally {
       setUploading(false);
     }

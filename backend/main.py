@@ -328,8 +328,6 @@ async def ask_question(request: QuestionRequest,
                 role_label = "Student" if msg.role == "user" else "Assistant"
                 history_text += f"{role_label}: {msg.content}\n"
 
-        SCORE_THRESHOLD = 0.9
-
         with langfuse.start_as_current_observation(
             as_type="span",
             name="rag-retrieval",
@@ -347,8 +345,7 @@ async def ask_question(request: QuestionRequest,
             rag_span.update(
                 output={
                     "best_cosine_score": best_score,
-                    "chunks_found": len(results_with_score),
-                    "branch": "pdf" if best_score < SCORE_THRESHOLD else "pdf+web"
+                    "chunks_found": len(results_with_score)
                 }
             )
 
@@ -419,16 +416,79 @@ async def ask_question(request: QuestionRequest,
         web_supplement = ""
         web_sources = []
 
-        if best_score >= SCORE_THRESHOLD:
-            print(f"RAG Relevance Score {best_score} above threshold, adding web supplement")
+        # web tool only needed when pdf relevance is low, to supplement missing information
+        web_tool = {
+            "name": "search_web",
+            "description": (
+                "Search the web to supplement the lecture-based answer. "
+                "ONLY call this when the lecture content clearly cannot answer the "
+                "question, or the question needs up-to-date / external information "
+                "beyond the lecture. If the lecture answer is sufficient, do NOT call it."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", 
+                              "description": "A clear web search query in English or German"}
+                },
+                "required": ["query"],
+            },
+        }
 
-            tool_output = str(search_web.invoke(request.question))
+        decision_system="""You decide whether a web search is needed to supplement a lecture-based answer.
+            Default: trust the lecture and do NOT search.
+            Only call search_web when the lecture content clearly cannot answer the question,
+            or the question requires current / external information beyond the lecture.
+            If the lecture answer is sufficient, just reply 'OK' and call no tool."""
+        decision_user = f"""Lecture content:
+            {context}
+
+            Student question: {request.question}
+
+            Lecture-based answer already produced:
+            {pdf_answer}
+
+            Decide whether a web search is needed."""
+        
+        with langfuse.start_as_current_observation(
+            as_type="generation",
+            name="web-decision",
+            model="claude-sonnet-4-5",
+            input={"question": request.question},
+        ) as decision_gen:
+            decision_response = claude.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=200,
+                system=decision_system,
+                tools=[web_tool],
+                tool_choice={"type": "auto"},
+                messages=[{"role": "user", "content": decision_user}],
+            )
+
+        web_query=None
+        for block in decision_response.content:
+            if block.type == "tool_use" and block.name == "search_web":
+                web_query = block.input.get("query")
+                break
+        
+        decision_gen.update(
+            output={"web_search": bool(web_query), "query": web_query},
+            usage_details={
+                "input": decision_response.usage.input_tokens,
+                "output": decision_response.usage.output_tokens
+            },
+        )
+
+        #only once web search
+        if web_query:
+            print(f"LLM decided web search needed, query: {web_query}")
+            tool_output = str(search_web.invoke(web_query))
             for line in tool_output.split("\n"):
                 if line.startswith("from:"):
                     web_sources.append(line.replace("from:", "").strip())
             print(f"search_web returned, sources: {web_sources}")
 
-            supplement_system = f"""You are a learning assistant helping international students.
+            supplement_system=f"""You are a learning assistant helping international students.
                 {weak_concepts_text}{learning_style_text}
 
                 Rules:
@@ -436,12 +496,12 @@ async def ask_question(request: QuestionRequest,
                 - Be concise, keep supplement under 200 characters
                 - Only use the web search results to supplement the PDF answer
                 - Do not repeat what the PDF answer already said"""
-
+            
             with langfuse.start_as_current_observation(
                 as_type="generation",
                 name="web-supplement",
                 model="claude-sonnet-4-5",
-                input={"question": request.question}
+                input={"question": request.question},
             ) as web_gen:
                 supplement_response = claude.messages.create(
                     model="claude-sonnet-4-5",
@@ -450,9 +510,8 @@ async def ask_question(request: QuestionRequest,
                     messages=[{"role": "user", "content": f"""PDF answer: {pdf_answer}
                         Web search results: {tool_output[:1500]}
                         Student question: {request.question}
-                        Provide a brief supplement based on the web search results."""}]
+                        Provide a brief supplement based on the web search results."""}],
                 )
-
                 web_supplement = supplement_response.content[0].text.strip()
                 source_type = "pdf+web"
 
@@ -460,10 +519,10 @@ async def ask_question(request: QuestionRequest,
                     output=web_supplement,
                     usage_details={
                         "input": supplement_response.usage.input_tokens,
-                        "output": supplement_response.usage.output_tokens
-                    }
+                        "output": supplement_response.usage.output_tokens,
+                    },
                 )
-
+            
         root_span.update(
             output={"source_type": source_type, "answer_length": len(pdf_answer)}
         )
@@ -473,9 +532,11 @@ async def ask_question(request: QuestionRequest,
         memory = update_memory(request.filename, request.question, full_answer, memory)
         save_memory(request.filename, memory, request.course_id)
 
+        # web_supplement added to sources
         final_sources = {
             "pages": sorted(list(pages_used)),
-            "urls": web_sources if source_type == "pdf+web" else []
+            "urls": web_sources,
+            "web_supplement": web_supplement,
         }
 
         user_message = Message(
@@ -483,14 +544,14 @@ async def ask_question(request: QuestionRequest,
             role="user",
             content=request.question,
             source_type=None,
-            sources=None
+            sources=None,
         )
         assistant_message = Message(
             pdf_file_id=pdf_file.id,
             role="assistant",
-            content=full_answer,
+            content=pdf_answer,     
             source_type=source_type,
-            sources=final_sources
+            sources=final_sources,
         )
         db.add(user_message)
         db.add(assistant_message)
@@ -500,12 +561,14 @@ async def ask_question(request: QuestionRequest,
 
     return {
         "question": request.question,
-        "answer": full_answer,
+        "pdf_answer": pdf_answer,
         "web_supplement": web_supplement,
+        "answer": pdf_answer, 
         "source_type": source_type,
         "sources": final_sources,
-        "relevance": best_score < SCORE_THRESHOLD
     }
+
+
 
 
 @app.get("/message/{filename}")
