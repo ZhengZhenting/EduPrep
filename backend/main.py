@@ -282,6 +282,39 @@ async def get_upload_status(filename: str,current_user: User = Depends(get_curre
     return upload_progress[filename]
 
 
+@app.get("/me/stats")
+async def get_my_stats(db: Session = Depends(get_db),
+                       current_user: User = Depends(get_current_user)):
+    # Gamification stats derived from existing data — no extra storage, no write logic.
+    msgs = (db.query(Message)
+            .join(PdfFile, Message.pdf_file_id == PdfFile.id)
+            .join(Course, PdfFile.course_id == Course.id)
+            .filter(Course.user_id == current_user.id))
+    quizzes = (db.query(QuizProgress)
+               .join(PdfFile, QuizProgress.pdf_file_id == PdfFile.id)
+               .join(Course, PdfFile.course_id == Course.id)
+               .filter(Course.user_id == current_user.id))
+
+    num_questions = msgs.filter(Message.role == "user").count()
+    num_quizzes = quizzes.count()
+
+    # XP + level: plain integer math
+    xp = num_questions * 5 + num_quizzes * 20
+    level = xp // 50 + 1
+
+    # Streak simplified to total distinct active days
+    dates = set()
+    for (created,) in msgs.with_entities(Message.created_at).all():
+        if created:
+            dates.add(created.date())
+    for (created,) in quizzes.with_entities(QuizProgress.created_at).all():
+        if created:
+            dates.add(created.date())
+    streak = len(dates)
+
+    return {"streak": streak, "level": level, "xp": xp}
+
+
 @app.post("/ask")
 async def ask_question(request: QuestionRequest, 
                        db: Session = Depends(get_db),

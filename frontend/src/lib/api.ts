@@ -203,3 +203,9 @@ export const MessagesAPI = {
     api.get(`/message/${encodeURIComponent(filename)}`, { params: { course_id: courseId } })
       .then((r) => r.data.messages ?? r.data ?? []),
 };
+
+export type UserStats = { streak: number; level: number; xp: number };
+
+export const StatsAPI = {
+  get: (): Promise<UserStats> => api.get("/me/stats").then((r) => r.data),
+};

@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useNavigate, Link, useRouterState } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { tokenStore } from "../lib/api";
+import { useEffect, useState } from "react";
+import { tokenStore, StatsAPI, type UserStats } from "../lib/api";
 import { useAuth } from "../lib/use-auth";
 import { Logo } from "../components/Logo";
 import { LogOut, Flame, Trophy } from "lucide-react";
@@ -19,8 +19,12 @@ function AuthLayout() {
     if (!tokenStore.getAccess()) navigate({ to: "/login", replace: true });
   }, [navigate, path]);
 
-  // streak demo (local persistence)
-  const streak = typeof window !== "undefined" ? Number(localStorage.getItem("eduprep_streak") || "3") : 3;
+  // Real stats from backend (refetched on navigation so they update after activity)
+  const [stats, setStats] = useState<UserStats | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined" || !tokenStore.getAccess()) return;
+    StatsAPI.get().then(setStats).catch(() => {});
+  }, [path]);
 
   return (
     <div className="min-h-screen">
@@ -36,11 +40,11 @@ function AuthLayout() {
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs">
               <Flame className="h-3.5 w-3.5 text-orange-500" />
-              <span className="font-semibold">{streak}-day streak</span>
+              <span className="font-semibold">{stats?.streak ?? 0} days active</span>
             </div>
             <div className="hidden sm:flex items-center gap-1.5 rounded-full glass px-3 py-1.5 text-xs">
               <Trophy className="h-3.5 w-3.5 text-amber-500" />
-              <span className="font-semibold">Lvl 2</span>
+              <span className="font-semibold">Lvl {stats?.level ?? 1}</span>
             </div>
             <div className="text-sm text-muted-foreground hidden sm:block">{user?.name || user?.email}</div>
             <button onClick={logout} className="rounded-lg p-2 text-muted-foreground hover:bg-black/[0.04] hover:text-foreground transition" title="Sign out">
