@@ -1,4 +1,4 @@
-# ADR 0001 — Semantic Chunking for PDF Ingestion
+# ADR 0002 — Semantic Chunking for PDF Ingestion
 
 - **Status:** Accepted
 - **Date:** 2026-06-22

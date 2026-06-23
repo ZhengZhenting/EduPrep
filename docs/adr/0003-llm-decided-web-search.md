@@ -1,4 +1,4 @@
-# ADR 0002 — LLM-Decided Web Search (replacing the cosine-distance threshold)
+# ADR 0003 — LLM-Decided Web Search (replacing the cosine-distance threshold)
 
 - **Status:** Accepted
 - **Date:** 2026-06-22
