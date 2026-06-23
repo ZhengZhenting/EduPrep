@@ -217,13 +217,14 @@ EduPrep is under **active, iterative development**. The path from "RAG chat app"
 |---|---|---|
 | P1–P3 | Tool layer · hybrid RAG · PostgreSQL · course/PDF management · LangFuse observability | ✅ Complete |
 | P4–P5 | JWT auth · memory system · personalised quiz · TanStack Router + shadcn/ui redesign | ✅ Complete |
-| **P6** | Evaluation baseline (golden dataset + metrics) · docs foundation | 🔜 Next |
-| **P7** | **Knowledge graph** construction + visualization (course-level concept network) | 📋 Planned |
-| **P8** | **GraphRAG** retrieval + learning-path generation | 📋 Planned |
-| **P9** | **Learning-science engine** — knowledge tracing (BKT) + spaced repetition (FSRS) + adaptive quizzing | 📋 Planned |
-| **P10** | **Agent + Tools + MCP** — LangGraph orchestration, EduPrep as an MCP server | 📋 Planned |
-| P11 | Performance / reliability / security hardening (Redis cache, rate limiting, circuit breaker) | 📋 Planned |
-| P12 | Testing · Docker · CI/CD · Prometheus + Grafana + Jaeger | 📋 Planned |
+| **P6** | Evaluation baseline ([harness](./backend/eval) + [golden dataset](./backend/eval/datasets/golden_qa.jsonl) + [methodology](./docs/evaluation/methodology.md) + [baseline](./docs/evaluation/baseline.md)) · docs foundation | ✅ Complete |
+| **P7** | **Vision-LLM multimodal ingestion** — read formulas / diagrams / images / tables that text-only extraction misses | 🔜 Next |
+| **P8** | **Knowledge graph** construction + visualization (course-level concept network) | 📋 Planned |
+| **P9** | **GraphRAG** retrieval + learning-path generation | 📋 Planned |
+| **P10** | **Learning-science engine** — knowledge tracing (BKT) + spaced repetition (FSRS) + adaptive quizzing | 📋 Planned |
+| **P11** | **Agent + Tools + MCP** — LangGraph orchestration, EduPrep as an MCP server | 📋 Planned |
+| P12 | Performance / reliability / security hardening (Redis cache, rate limiting, circuit breaker) | 📋 Planned |
+| P13 | Testing · Docker · CI/CD · Prometheus + Grafana + Jaeger | 📋 Planned |
 
 📍 **Full interactive bilingual roadmap:** [`docs/roadmap/eduprep_roadmap.html`](./docs/roadmap/eduprep_roadmap.html)
 

@@ -1,0 +1,1027 @@
+{
+  "summary": {
+    "k": 5,
+    "n_total": 30,
+    "n_scored": 21,
+    "recall_at_k": 0.8095238095238095,
+    "precision_at_k": 0.19047619047619047,
+    "mrr": 0.515079365079365
+  },
+  "per_question": [
+    {
+      "id": "prompt-q01",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        4
+      ],
+      "retrieved_pages": [
+        2,
+        3,
+        40,
+        11,
+        28
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "Prompt-Engineering是系统化设计大语言模型输入的方法。它的核心是通过清晰、有上下文和结构化的提示词，引导LLM生成期望的输出结果。",
+      "pages_used": [
+        2,
+        3,
+        11,
+        28,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly defines Prompt-Engineering as the systematic design of LLM inputs (supported by page 40 'Systematische Gestaltung von LLM-Eingaben') and mentions the core principles of clarity, context, and structure (also supported by pages 40 and 2). All claims are grounded in the sources. The ground truth relevant page is 4, but the sources provided don't include a page 4; the answer cites pages 2, 3, 11, 28, 40. Pages 3 and 40 are directly relevant to the definition; pages 11 and 28 are about context/pitfalls and are tangential extras. Citation is mostly correct with some extras and missing the exact ground-truth page.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q02",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        4
+      ],
+      "retrieved_pages": [
+        3,
+        4,
+        28,
+        27,
+        40
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.5,
+      "answer": "讲义中未找到直接相关内容。\n\n讲义主要介绍了Prompt-Engineering的定义、基本原则（清晰性、上下文、结构）、技术方法和常见错误，但没有明确列出\"两个主要目标\"。",
+      "pages_used": [
+        3,
+        4,
+        27,
+        28,
+        40
+      ],
+      "judge": {
+        "reasoning": "The reference indicates the two main goals (maximizing output quality/relevance and avoiding errors like hallucination) should be found on page 4 (Definition slide). The answer claims the lecture contains no relevant content and fails to state the two goals, so it is incorrect. While the listed sources (as shown) don't contain the full text of page 4, the ground truth indicates the answer was available there; the answer did not provide the correct information. Faithfulness is acceptable since it makes no fabricated claims. Citation includes the relevant page 4 but buries it among many irrelevant pages and denies its content.",
+        "correctness": 0,
+        "faithfulness": 0.5,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.333
+      }
+    },
+    {
+      "id": "prompt-q03",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        5
+      ],
+      "retrieved_pages": [
+        5,
+        3,
+        2,
+        28,
+        41
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "Prompt-Engineering很重要,因为它直接影响四个关键方面:\n\n1. **质量**:更好的提示词=更好的结果\n2. **效率**:减少迭代次数,更快获得结果\n3. **成本**:优化的提示词=更少的token=更低的费用\n4. **可靠性**:获得一致且可预测的输出",
+      "pages_used": [
+        2,
+        3,
+        5,
+        28,
+        41
+      ],
+      "judge": {
+        "reasoning": "The answer correctly identifies all four key reasons (quality, efficiency, cost, reliability) directly from page 5, and includes the framing that prompt quality determines result quality. All claims are faithful to the source. However, the citation includes pages 2, 3, 28, and 41 which are not relevant to this specific answer—only page 5 is the relevant source, so there are extra citations.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q04",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        8,
+        10,
+        12
+      ],
+      "retrieved_pages": [
+        3,
+        2,
+        40,
+        7,
+        4
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "根据讲义内容,Prompt-Engineering的三个基本原则是:\n\n1. **Klarheit**(清晰性)\n2. **Kontext**(上下文)\n3. **Struktur**(结构)",
+      "pages_used": [
+        2,
+        3,
+        4,
+        7,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly identifies the three principles (Klarheit, Kontext, Struktur), matching the reference. All claims are supported by the sources (pages 2, 7, 40 explicitly list them). Citations include relevant pages 7 (and 2, 40 which also mention the principles), but the ground truth pages are 8, 10, 12, which were not provided in the sources; the cited pages overlap with the relevant content available but include some non-essential pages (3, 4) and miss the exact ground-truth pages.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q05",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        8
+      ],
+      "retrieved_pages": [
+        8,
+        2,
+        3,
+        40,
+        12
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "讲义中提到，Klarheit（清晰性）原则指的是使用精确、明确且正确的表述，避免歧义。具体包括：精确表述、避免多义性、具体化、直接提问而非冗长表述，以及使用正确术语并避免拼写错误。",
+      "pages_used": [
+        2,
+        3,
+        8,
+        12,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer accurately describes the Klarheit principle, fully matching page 8 content. All claims are supported by the sources. However, citations include extras (pages 2, 3, 12, 40) beyond the relevant page 8, so citation is partial.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q06",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        10
+      ],
+      "retrieved_pages": [
+        40,
+        3,
+        12,
+        37,
+        11
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "根据讲义,**Kontext(上下文)原则**是指为LLM提供充分的背景信息,让模型明确理解具体需求。例如:不要只说\"写API代码\",而要说明\"用Node.js和Express创建REST API,支持CRUD操作、使用JSON格式并实现错误处理\"。提供上下文能避免模糊不清的输出。",
+      "pages_used": [
+        3,
+        11,
+        12,
+        37,
+        40
+      ],
+      "judge": {
+        "reasoning": "The ground truth page is 10, which is not in the sources provided. The answer captures the general idea that Kontext means providing sufficient background information so the LLM understands the specific need, supported by page 11's example. However, the reference hint mentions more specific components (relevant information, domain background, clear goal setting, constraints/requirements) that the answer doesn't fully enumerate, so it's partly correct. The claims are grounded in page 11's example, faithful. Citation includes page 11 (relevant) but adds many irrelevant pages (3, 12, 37, 40) and misses page 10.",
+        "correctness": 0.5,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.667
+      }
+    },
+    {
+      "id": "prompt-q07",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        12
+      ],
+      "retrieved_pages": [
+        10,
+        40,
+        8,
+        2,
+        12
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.2,
+      "answer": "讲义中未找到直接相关内容。\n\n讲义提到了\"Struktur\"(结构)是Prompt-Engineering的基本原则之一,并简要说明结构包括信息的逻辑组织和使用Markdown、列表等格式化方式来提高可读性,帮助LLM理解需求。但具体详细描述被截断了。",
+      "pages_used": [
+        2,
+        8,
+        10,
+        12,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly describes the Struktur principle: it covers logical organization of information and formatting (Markdown, lists) to improve readability and help the LLM understand requirements, matching page 12. However, the opening claim '讲义中未找到直接相关内容' (no relevant content found) is misleading and contradictory since the content IS found on page 12. The citation includes page 12 but adds many irrelevant pages (2, 8, 10, 40). Faithfulness is good — claims are supported. Citation has extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q08",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        15
+      ],
+      "retrieved_pages": [
+        16,
+        2,
+        40,
+        15,
+        17
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.25,
+      "answer": "Zero-shot Prompting是一种不提供示例的单一提示方法,适用于简单、易理解的任务。优点是快速且消耗较少token,缺点是处理复杂任务时可能效果不佳。",
+      "pages_used": [
+        2,
+        15,
+        16,
+        17,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly defines zero-shot prompting as a single prompt without examples, suited for simple tasks, with advantages (fast, low token use) and disadvantages (insufficient for complex tasks). This matches page 15 exactly. All claims are supported by the sources. The key ground-truth page 15 is cited, though extra pages (2, 16, 17, 40) are also included as minor extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q09",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        17
+      ],
+      "retrieved_pages": [
+        15,
+        2,
+        16,
+        17,
+        40
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.25,
+      "answer": "Few-shot Prompting是通过多个示例来演示所需模式的提示技术。\n\n**适用场景**：复杂任务和模式学习\n\n**优点**：通过示例演示获得更好的结果\n\n**缺点**：消耗更多token",
+      "pages_used": [
+        2,
+        15,
+        16,
+        17,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly defines Few-shot Prompting as a technique using multiple examples to demonstrate the desired pattern, and accurately lists application (complex tasks, pattern learning), advantages (better results through demonstration), and disadvantages (higher token consumption), all matching page 17. All claims are faithful to the sources. Citation includes the correct page 17 but adds several irrelevant pages (2, 15, 16, 40), warranting a partial citation score.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q10",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        19
+      ],
+      "retrieved_pages": [
+        19,
+        2,
+        40,
+        3,
+        11
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "Chain-of-Thought (CoT) Prompting是一种提示技术,通过引导大语言模型逐步思考来解决问题。\n\n**核心特点:**\n- 激励模型进行分步推理\n- 适用于复杂的逻辑和数学问题\n- 提升推理能力\n- 典型用法:在提示中加入\"让我们一步步来思考\"(Lass uns Schritt für Schritt vorgehen)\n\n简单说,CoT让模型像人类一样展示思考过程,而不是直接给出答案,从而提高复杂问题的解决质量。",
+      "pages_used": [
+        2,
+        3,
+        11,
+        19,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly defines CoT prompting based on page 19, covering step-by-step reasoning, application to complex logical/mathematical problems, improved reasoning abilities, and the technique phrase. All claims are supported by the sources. However, the citation includes the relevant page 19 along with extra unnecessary pages (2, 3, 11, 40), which warrants a partial citation score.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q11",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        21
+      ],
+      "retrieved_pages": [
+        21,
+        2,
+        40,
+        3,
+        11
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "Role-based Prompting是指给大语言模型分配一个特定角色，以利用其领域专业知识。例如：\"你是一位高级软件开发工程师...\"。这种方法能提供更好的上下文理解和更一致的输出结果，特别适用于领域特定的任务。",
+      "pages_used": [
+        2,
+        3,
+        11,
+        21,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly defines role-based prompting matching page 21 exactly (assigning a role, domain expertise, better contextualization, consistent outputs, example). All claims are faithful to the sources. However, citations include many irrelevant pages (2, 3, 11, 40) alongside the correct page 21, which is an over-citation issue.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q12",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        23
+      ],
+      "retrieved_pages": [
+        23,
+        2,
+        3,
+        40,
+        21
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "Template-basiertes Prompting是一种使用可重复利用的结构来处理重复性任务的方法。它通过变量占位符实现动态内容填充,具有一致性、高效性和易维护性的优点。",
+      "pages_used": [
+        2,
+        3,
+        21,
+        23,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly describes template-based prompting: reusable structures for recurring tasks, variable placeholders for dynamic content, and benefits of consistency, efficiency, maintainability — all directly supported by Page 23. Faithfulness is strong. However, the citation includes the correct page 23 but adds many irrelevant pages (2, 3, 21, 40), so it has extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q13",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        15
+      ],
+      "retrieved_pages": [
+        16,
+        40,
+        15,
+        17,
+        2
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.3333333333333333,
+      "answer": "Zero-shot Prompting的优点是：快速、消耗较少的token。缺点是：在复杂任务中可能表现不足。",
+      "pages_used": [
+        2,
+        15,
+        16,
+        17,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states the advantages (fast, fewer tokens) and disadvantages (insufficient for complex tasks), matching page 15 exactly. The content is fully supported by the sources. However, the citation includes the correct page 15 but adds many extraneous pages (2, 16, 17, 40) that aren't directly relevant to the advantages/disadvantages.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q14",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        32
+      ],
+      "retrieved_pages": [
+        3,
+        32,
+        40,
+        27,
+        21
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.5,
+      "answer": "Prompt-Optimierungsprozess包含五个步骤：\n\n1. **Initialer Prompt** - 创建初始版本\n2. **Testing** - 用不同输入测试\n3. **Analyse** - 评估结果\n4. **Anpassung** - 优化提示词\n5. **Wiederholung** - 迭代直到满意\n\n这是一个持续改进的迭代过程。",
+      "pages_used": [
+        3,
+        21,
+        27,
+        32,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly lists all five steps matching the source on page 32, fully supported by the sources. However, the citation includes many extra pages (3, 21, 27, 40) that are irrelevant to the question, while the correct page 32 is included.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q15",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        15,
+        17
+      ],
+      "retrieved_pages": [
+        40,
+        16,
+        2,
+        17,
+        15
+      ],
+      "recall": 1.0,
+      "precision": 0.4,
+      "rr": 0.25,
+      "answer": "**Zero-shot vs Few-shot Prompting对比：**\n\n**Zero-shot（零样本）：**\n- 无需提供示例，直接提问\n- 适合简单、明确的任务\n- 优点：快速、消耗token少\n- 缺点：复杂任务效果可能不佳\n\n**Few-shot（少样本）：**\n- 通过多个示例展示期望的模式\n- 适合复杂任务，帮助模型学习模式\n- 优点：通过示例演示获得更好结果\n- 缺点：消耗更多token\n\n**核心区别：** Zero-shot直接提问，Few-shot先给示例再提问。",
+      "pages_used": [
+        2,
+        15,
+        16,
+        17,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer accurately compares Zero-shot and Few-shot prompting, matching the sources (pages 15 and 17) on definitions, applications, advantages, and disadvantages. All claims are faithfully supported. Citations include the relevant pages 15 and 17, but also add pages 2, 16, and 40 which are tangential (overview/example), so citation has extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q16",
+      "answer_coverage": "fuzzy",
+      "content_modality": "text",
+      "relevant_pages": [
+        5
+      ],
+      "retrieved_pages": [
+        42,
+        33,
+        16,
+        41,
+        5
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.2,
+      "answer": "讲义中未找到直接相关内容。讲义仅提到\"优化的提示词=更少的token=更低的成本\"这一原则性说明,但没有给出具体的token节省数据或百分比。",
+      "pages_used": [
+        5,
+        16,
+        33,
+        41,
+        42
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states that the lecture only gives the principle (optimized prompts = fewer tokens = lower costs) on page 5 without concrete numbers, matching the reference hint. All claims are supported by the sources. Citation includes the relevant page 5 but adds extraneous pages 16, 33, 41, 42 that are not directly relevant to the question.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q17",
+      "answer_coverage": "fuzzy",
+      "content_modality": "text",
+      "relevant_pages": [
+        19
+      ],
+      "retrieved_pages": [
+        19,
+        40,
+        2,
+        17,
+        20
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "讲义中未找到直接相关内容。\n\n讲义只介绍了Chain-of-Thought的应用方法(通过\"让我们一步步来\"等提示词引导模型逐步推理),但没有说明其在模型内部的工作机制。",
+      "pages_used": [
+        2,
+        17,
+        19,
+        20,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly identifies that the lecture only describes CoT's application/purpose (step-by-step reasoning prompting) and does not explain the internal model mechanism, which matches the reference hint. All claims are supported by the sources. The relevant page 19 is cited, though several extra pages (2, 17, 20, 40) are included, making the citation somewhat over-broad. The honesty is good as it openly states the lecture lacks the internal mechanism explanation, but since coverage is fuzzy, honesty is null.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q18",
+      "answer_coverage": "fuzzy",
+      "content_modality": "text",
+      "relevant_pages": [
+        21,
+        22
+      ],
+      "retrieved_pages": [
+        21,
+        2,
+        40,
+        22,
+        23
+      ],
+      "recall": 1.0,
+      "precision": 0.4,
+      "rr": 1.0,
+      "answer": "讲义中未找到直接相关内容。讲义仅介绍了Role-based Prompting的定义、应用场景、优势和一个示例,但没有列出具体的最佳实践。",
+      "pages_used": [
+        2,
+        21,
+        22,
+        23,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly notes that the lecture does not list explicit best practices beyond the example, which aligns with the reference hint. This is faithful to the sources and honestly states the limitation. However, the question asks what best practices exist beyond the example, and a fuzzy-coverage answer could have inferred from the slides (role assignment for domain expertise, context/perspective, specifying experience level, structured requirements) which the slides do support implicitly. The answer is honest and faithful but largely declines to provide the inferable practices, making it partly responsive. Citations include relevant pages 21, 22 but add extras (2, 23, 40) not central.",
+        "correctness": 0.5,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.667
+      }
+    },
+    {
+      "id": "prompt-q19",
+      "answer_coverage": "fuzzy",
+      "content_modality": "text",
+      "relevant_pages": [
+        4
+      ],
+      "retrieved_pages": [
+        4,
+        15,
+        9,
+        17,
+        41
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "讲义中未找到直接相关内容。\n\n讲义提到Prompt-Engineering的目标之一是\"避免幻觉等错误\"(Vermeiden von Fehlern wie Haluzinieren),但没有具体说明技术方法。",
+      "pages_used": [
+        4,
+        9,
+        15,
+        17,
+        41
+      ],
+      "judge": {
+        "reasoning": "The answer correctly identifies that the lecture mentions avoiding hallucinations as a goal (page 4) but does not provide specific technical methods, which matches the reference hint. The question is fuzzy/partly covered. The answer is faithful — it does not fabricate methods, instead honestly stating the lecture lacks specifics. Citation includes the correct page 4 but adds several extras (9, 15, 17, 41) that are not relevant to the hallucination question, so citation is partial. Correctness is good given it accurately reflects the lecture's limited content.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q20",
+      "answer_coverage": "fuzzy",
+      "content_modality": "text",
+      "relevant_pages": [
+        32
+      ],
+      "retrieved_pages": [
+        2,
+        26,
+        4,
+        40,
+        27
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "讲义中未找到直接相关内容。\n\n讲义主要介绍了Prompt-Engineering的基本原则、技术方法和常见错误,但没有提及具体的工具或框架。",
+      "pages_used": [
+        2,
+        4,
+        26,
+        27,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer honestly states the lecture does not mention specific tools or frameworks for prompt optimization, which aligns with the reference hint that the lecture describes the optimization process but not tools. The claims are supported by the sources. However, the ground-truth relevant page is 32, which the answer did not cite; the cited pages are related context but not the key page. Citation is partial/off.",
+        "correctness": 0.5,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.667
+      }
+    },
+    {
+      "id": "prompt-q21",
+      "answer_coverage": "fuzzy",
+      "content_modality": "text",
+      "relevant_pages": [
+        15,
+        17
+      ],
+      "retrieved_pages": [
+        2,
+        40,
+        17,
+        15,
+        16
+      ],
+      "recall": 1.0,
+      "precision": 0.4,
+      "rr": 0.3333333333333333,
+      "answer": "Zero-shot使用更少的token，因为只包含一个简单的提示词，没有示例。Few-shot使用更多token，因为需要在提示中包含多个示例来演示所需的模式。讲义明确指出：Zero-shot的优点是\"快速、token消耗少\"，而Few-shot的缺点是\"更高的token消耗\"。",
+      "pages_used": [
+        2,
+        15,
+        16,
+        17,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly captures the qualitative distinction: Zero-shot uses fewer tokens (single prompt, no examples) while Few-shot uses more due to multiple examples. This matches pages 15 and 17. The claims are faithful to the sources. Citations include the relevant pages (15, 17) but add extraneous pages (2, 16, 40), warranting a partial citation score.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "prompt-q22",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        27,
+        23,
+        25,
+        21,
+        14
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "讲义中未找到直接相关内容。\n\n讲义介绍的是基础Prompting技术(如Role-based、Template-based等),未提及2025年的新技术。",
+      "pages_used": [
+        14,
+        21,
+        23,
+        25,
+        27
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states the lecture does not contain information about new 2025 prompting techniques, which matches the reference hint. It honestly defers and accurately summarizes what the lecture does cover (Role-based, Template-based), all supported by the sources. Honesty is clear and appropriate. Citations are present but not scored for 'none' coverage.",
+        "correctness": null,
+        "faithfulness": 1.0,
+        "citation": null,
+        "honesty": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "id": "prompt-q23",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        4,
+        2,
+        26,
+        3,
+        29
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "讲义中未找到直接相关内容。\n\n讲义主要介绍了Prompt-Engineering的基本概念、原则和技巧,但没有具体比较Claude和GPT-4在Prompt-Engineering方面的差异。",
+      "pages_used": [
+        2,
+        3,
+        4,
+        26,
+        29
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states that the lecture does not cover the specific differences between Claude and GPT-4 in prompt engineering, which matches the ground truth that this topic is not in the lecture. All claims are supported by the sources (the lecture covers general concepts only). The honesty is high as it clearly defers and does not fabricate model-specific differences.",
+        "correctness": null,
+        "faithfulness": 1.0,
+        "citation": null,
+        "honesty": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "id": "prompt-q24",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        11,
+        27,
+        17,
+        2,
+        3
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "讲义中未找到直接相关内容。",
+      "pages_used": [
+        2,
+        3,
+        11,
+        17,
+        27
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states the lecture does not contain pricing information, which is honest and accurate given the sources only cover prompt engineering. No fabricated claims are made. The honesty is somewhat undercut by citing irrelevant pages rather than triggering a web search or clearly noting current pricing requires external lookup, but it does honestly defer.",
+        "correctness": null,
+        "faithfulness": 1.0,
+        "citation": null,
+        "honesty": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "id": "prompt-q25",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        2,
+        40,
+        3,
+        16,
+        4
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "讲义中未找到直接相关内容。\n\n这节课主要讲解Prompt-Engineering的基础知识,包括提示词设计的原则和技巧,并未涉及RAG相关内容。",
+      "pages_used": [
+        2,
+        3,
+        4,
+        16,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states that the lecture does not cover RAG, which is faithful to the sources (these pages discuss Prompt-Engineering only, with no RAG content). It honestly defers rather than fabricating an explanation. The faithfulness is sound and honesty is clear.",
+        "correctness": null,
+        "faithfulness": 1.0,
+        "citation": null,
+        "honesty": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "id": "prompt-q26",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        25,
+        2,
+        23,
+        40,
+        17
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "讲义中未找到直接相关内容。",
+      "pages_used": [
+        2,
+        17,
+        23,
+        25,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states that the lecture does not contain relevant content on temperature settings, which matches the reference hint that the lecture never mentions the temperature parameter. This is honest deferral. The faithfulness is intact as no fabricated claims are made. The citation of pages is unnecessary for a 'none' answer but does not introduce fabrication.",
+        "correctness": null,
+        "faithfulness": 1.0,
+        "citation": null,
+        "honesty": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "id": "prompt-q27",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        40,
+        2,
+        25,
+        21,
+        28
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "讲义中未找到直接相关内容。\n\n讲义主要涵盖了Prompt-Engineering的基本原则、技术(如Zero-shot、Few-shot、Chain-of-Thought)和常见错误,但没有涉及Prompt-Injection攻击的防护措施。",
+      "pages_used": [
+        2,
+        21,
+        25,
+        28,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states that the lecture does not cover prompt injection defenses, which matches the reference hint. It honestly defers and accurately describes what the lecture does contain, all supported by the sources. No fabrication present.",
+        "correctness": null,
+        "faithfulness": 1.0,
+        "citation": null,
+        "honesty": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "id": "prompt-q28",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        15,
+        26,
+        3,
+        32,
+        21
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "讲义中未找到直接相关内容。\n\n讲义主要介绍了Prompt-Engineering的基本技术(如Zero-shot、Role-based Prompting)和优化流程,但没有提及具体的Benchmark数据集。",
+      "pages_used": [
+        3,
+        15,
+        21,
+        26,
+        32
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states that the lecture does not cover benchmark datasets for prompt evaluation, which aligns with the reference hint. All claims about lecture content (techniques like Zero-shot, Role-based Prompting, optimization process) are supported by the sources. It honestly defers and acknowledges the lecture lacks the requested information.",
+        "correctness": null,
+        "faithfulness": 1.0,
+        "citation": null,
+        "honesty": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "id": "prompt-q29",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        11,
+        40,
+        28,
+        2,
+        25
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "讲义中未找到直接相关内容。\n\n这份讲义主要讲解Prompt Engineering的基础原则和技巧,没有涉及Anthropic API的具体实现细节。",
+      "pages_used": [
+        2,
+        11,
+        25,
+        28,
+        40
+      ],
+      "judge": {
+        "reasoning": "The answer correctly identifies that the lecture does not contain information about implementing prompt-caching in the Anthropic API, which matches the reference hint. It honestly defers and notes the lecture only covers prompt engineering basics. All claims are supported by the sources (which indeed cover prompt engineering fundamentals, not API caching). Honesty is high as it clearly states the lecture lacks the content rather than fabricating.",
+        "correctness": null,
+        "faithfulness": 1.0,
+        "citation": null,
+        "honesty": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "id": "prompt-q30",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        3,
+        2,
+        15,
+        40,
+        24
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "讲义中未找到直接相关内容。",
+      "pages_used": [
+        2,
+        3,
+        15,
+        24,
+        40
+      ],
+      "judge": {
+        "reasoning": "The lecture does not mention LangChain at all, so the answer correctly states that no directly relevant content is found. This is honest and faithful to the sources, which only cover prompt-engineering basics and templates without LangChain. The citation dimension is null for 'none' coverage, but the answer's honesty about the lecture lacking the content is clear, though it could have suggested checking external sources.",
+        "correctness": null,
+        "faithfulness": 1.0,
+        "citation": null,
+        "honesty": 1.0,
+        "overall": 1.0
+      }
+    }
+  ],
+  "answer_quality": {
+    "correctness": 0.8809523809523809,
+    "faithfulness": 0.9833333333333333,
+    "citation": 0.5,
+    "honesty": 1.0,
+    "overall": 0.8498333333333333,
+    "n_judged": 30
+  }
+}

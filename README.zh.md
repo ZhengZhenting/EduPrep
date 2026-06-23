@@ -217,13 +217,14 @@ EduPrep 处于**持续、迭代式开发**中。从"RAG 聊天应用"到"知识�
 |---|---|---|
 | P1–P3 | 工具层 · 混合 RAG · PostgreSQL · 课程/PDF 管理 · LangFuse 可观测性 | ✅ 完成 |
 | P4–P5 | JWT 认证 · 记忆系统 · 个性化测验 · TanStack Router + shadcn/ui 重构 | ✅ 完成 |
-| **P6** | 评测基线（黄金数据集 + 指标）· 文档地基 | 🔜 下一步 |
-| **P7** | **知识图谱**构建 + 可视化（课程级概念网络） | 📋 规划 |
-| **P8** | **GraphRAG** 检索 + 学习路径生成 | 📋 规划 |
-| **P9** | **学习科学引擎** —— 知识追踪 (BKT) + 间隔重复 (FSRS) + 自适应出题 | 📋 规划 |
-| **P10** | **Agent + Tools + MCP** —— LangGraph 编排，EduPrep 作为 MCP server | 📋 规划 |
-| P11 | 性能 / 可靠性 / 安全加固（Redis 缓存、限流、熔断器） | 📋 规划 |
-| P12 | 测试 · Docker · CI/CD · Prometheus + Grafana + Jaeger | 📋 规划 |
+| **P6** | 评测基线（[评测套件](./backend/eval) + [黄金数据集](./backend/eval/datasets/golden_qa.jsonl) + [方法论](./docs/evaluation/methodology.md) + [基线](./docs/evaluation/baseline.md)）· 文档地基 | ✅ 完成 |
+| **P7** | **Vision-LLM 多模态 ingestion** —— 读懂纯文字抽取丢失的公式 / 图解 / 图片 / 表格 | 🔜 下一步 |
+| **P8** | **知识图谱**构建 + 可视化（课程级概念网络） | 📋 规划 |
+| **P9** | **GraphRAG** 检索 + 学习路径生成 | 📋 规划 |
+| **P10** | **学习科学引擎** —— 知识追踪 (BKT) + 间隔重复 (FSRS) + 自适应出题 | 📋 规划 |
+| **P11** | **Agent + Tools + MCP** —— LangGraph 编排，EduPrep 作为 MCP server | 📋 规划 |
+| P12 | 性能 / 可靠性 / 安全加固（Redis 缓存、限流、熔断器） | 📋 规划 |
+| P13 | 测试 · Docker · CI/CD · Prometheus + Grafana + Jaeger | 📋 规划 |
 
 📍 **完整的双语交互式路线图：** [`docs/roadmap/eduprep_roadmap.html`](./docs/roadmap/eduprep_roadmap.html)
 

@@ -13,3 +13,4 @@ how retrieval is augmented.
 | [0001](./0001-vector-store-chromadb.md) | Vector store — ChromaDB | Accepted | 2026-06-23 |
 | [0002](./0002-semantic-chunking.md) | Semantic chunking for PDF ingestion | Accepted | 2026-06-22 |
 | [0003](./0003-llm-decided-web-search.md) | LLM-decided web search (replaces cosine-distance threshold) | Accepted | 2026-06-22 |
+| [0004](./0004-multimodal-ingestion-vision-llm.md) | Multimodal ingestion via Vision-LLM (vs Nougat / DeepDoc) | Proposed | 2026-06-24 |
