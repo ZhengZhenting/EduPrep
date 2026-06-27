@@ -271,6 +271,7 @@
       <div class="phase-col">
         <h5><span class="zh">功能 / 技术</span><span class="en">Features / Tech</span></h5>
         <ul>
+          <li><span class="zh"><b>先做(零成本快速赢点)</b>：幻灯片预处理 —— 切块前剥掉每页重复的导航页眉/页脚（实验发现这是 NCC 讲义 text recall 仅 0.25 的主因）</span><span class="en"><b>Do first (zero-cost quick win)</b>: slide preprocessing — strip repeated nav headers/footers before chunking (found to be the main cause of NCC's 0.25 text recall)</span></li>
           <li><span class="zh">每页渲染成图片，用 Claude 视觉转写：公式→LaTeX、图解→文字描述、图片→内容描述、表格→结构化</span><span class="en">Render each page to an image, transcribe via Claude vision: formula→LaTeX, diagram→text description, image→content description, table→structured</span></li>
           <li><span class="zh">转写文本与原文一起切块入库（增强检索召回）</span><span class="en">Chunk transcribed text alongside the original (boosts retrieval recall)</span></li>
           <li><span class="zh">用 P6 的 <code>content_modality</code> 标签量化提升：公式/图解题的 Recall 增益</span><span class="en">Quantify the gain via P6's <code>content_modality</code> tags: recall lift on formula/figure questions</span></li>
@@ -422,8 +423,8 @@
   <!-- P12 Hardening -->
   <div class="phase p12">
     <div class="phase-head">
-      <div><span class="code">P12</span><h3><span class="zh">加固：性能 / 可靠性 / 安全</span><span class="en">Hardening: Performance / Reliability / Security</span></h3></div>
-      <span class="phase-date">12-19 → 2027-01-09 · 3w</span>
+      <div><span class="code">P12</span><h3><span class="zh">加固：可靠性 / 安全 / 治理</span><span class="en">Hardening: Reliability / Security / Governance</span></h3></div>
+      <span class="phase-date">12-19 → 2027-01-16 · 4w</span>
     </div>
     <span class="phase-depth depth-eng"><span class="zh">工程深度</span><span class="en">Engineering</span></span>
     <div class="phase-grid">
@@ -434,13 +435,16 @@
           <li><span class="zh">限流：token bucket，10/min/user on /ask</span><span class="en">Rate limiting: token bucket, 10/min/user on /ask</span></li>
           <li><span class="zh">Claude API 熔断器 (pybreaker) + 降级响应</span><span class="en">Claude API circuit breaker (pybreaker) + degraded response</span></li>
           <li><span class="zh">Prompt injection 检测 + Pydantic 校验 + CORS 白名单</span><span class="en">Prompt-injection detection + Pydantic validation + CORS whitelist</span></li>
+          <li><span class="zh"><b>治理</b>：模型版本 pin + 漂移追踪；Prompt 版本管理（LangFuse Prompt Management）</span><span class="en"><b>Governance</b>: pin model versions + drift tracking; prompt versioning (LangFuse Prompt Management)</span></li>
+          <li><span class="zh"><b>回滚机制</b>：模型 / prompt / DB 迁移回滚（依赖 P13 eval 门禁检测退化）</span><span class="en"><b>Rollback</b>: model / prompt / DB-migration rollback (relies on P13 eval gate to detect regressions)</span></li>
+          <li><span class="zh"><b>GDPR / 数据隐私</b>：欧盟学生数据 —— 导出 / 删除（被遗忘权）/ 数据最小化</span><span class="en"><b>GDPR / data privacy</b>: EU student data — export / delete (right to be forgotten) / data minimization</span></li>
         </ul>
       </div>
       <div class="phase-col">
         <h5><span class="zh">文档产出</span><span class="en">Docs Deliverables</span></h5>
         <ul class="doc-list">
-          <li><code>reliability.md</code></li>
-          <li><code>ADR-0010</code> <span class="zh">缓存策略</span><span class="en">caching strategy</span></li>
+          <li><code>reliability.md</code> · <code>governance.md</code><span class="zh">（版本管理 / 回滚 / GDPR）</span><span class="en"> (versioning / rollback / GDPR)</span></li>
+          <li><code>ADR-0010</code> <span class="zh">缓存策略</span><span class="en">caching strategy</span> · <code>ADR-0011</code> <span class="zh">模型/prompt 版本治理</span><span class="en">model/prompt version governance</span></li>
         </ul>
       </div>
     </div>
@@ -450,7 +454,7 @@
   <div class="phase p13">
     <div class="phase-head">
       <div><span class="code">P13</span><h3><span class="zh">测试 + Docker + CI/CD + 监控</span><span class="en">Testing + Docker + CI/CD + Monitoring</span></h3></div>
-      <span class="phase-date">2027-01-09 → 02-13 · 5w</span>
+      <span class="phase-date">2027-01-16 → 02-20 · 5w</span>
     </div>
     <span class="phase-depth depth-eng"><span class="zh">工程深度 · 收尾</span><span class="en">Engineering · finishing</span></span>
     <div class="phase-grid">
@@ -461,13 +465,14 @@
           <li><span class="zh">Locust 负载测试（10 并发，找 P99 瓶颈）</span><span class="en">Locust load test (10 concurrent, find P99 bottleneck)</span></li>
           <li><span class="zh">Dockerfile + docker-compose 全栈</span><span class="en">Dockerfile + full-stack docker-compose</span></li>
           <li><span class="zh">GitHub Actions：CI (pytest+black+eslint) / CD</span><span class="en">GitHub Actions: CI (pytest+black+eslint) / CD</span></li>
+          <li><span class="zh"><b>Eval 回归门禁</b>：CI 自动跑 <code>run_eval</code>，指标对照 baseline 退化（如 Recall 跌破阈值）则<b>挡住合并</b></span><span class="en"><b>Eval regression gate</b>: CI runs <code>run_eval</code> automatically; block the merge if metrics regress vs baseline (e.g. Recall below threshold)</span></li>
           <li><span class="zh">Prometheus + Grafana + Jaeger 全链路监控</span><span class="en">Prometheus + Grafana + Jaeger full-stack observability</span></li>
         </ul>
       </div>
       <div class="phase-col">
         <h5><span class="zh">文档产出</span><span class="en">Docs Deliverables</span></h5>
         <ul class="doc-list">
-          <li><code>deployment.md</code> · <code>testing.md</code></li>
+          <li><code>deployment.md</code> · <code>testing.md</code> · <code>eval-ci-gate.md</code></li>
           <li><code>docs/evaluation/load-test-report.md</code></li>
           <li><code>docs/roadmap.md</code></li>
           <li><span class="zh">技术博客 1–2 篇</span><span class="en">1–2 technical blog posts</span></li>
@@ -493,8 +498,8 @@
         <tr><td><code>P9</code></td><td>9/12–10/10</td><td><span class="zh">GraphRAG 检索 + 学习路径</span><span class="en">GraphRAG retrieval + learning path</span></td><td><span class="phase-depth depth-algo"><span class="zh">算法</span><span class="en">Algo</span></span></td></tr>
         <tr><td><code>P10</code></td><td>10/10–11/14</td><td><span class="zh">学习科学引擎</span><span class="en">Learning-science engine</span></td><td><span class="phase-depth depth-domain"><span class="zh">领域</span><span class="en">Domain</span></span></td></tr>
         <tr><td><code>P11</code></td><td>11/14–12/19</td><td>Agent + Tools + MCP</td><td><span class="phase-depth depth-frontier"><span class="zh">前沿</span><span class="en">Frontier</span></span></td></tr>
-        <tr><td><code>P12</code></td><td>12/19–1/09</td><td><span class="zh">性能 / 可靠性 / 安全</span><span class="en">Performance / reliability / security</span></td><td><span class="phase-depth depth-eng"><span class="zh">工程</span><span class="en">Eng</span></span></td></tr>
-        <tr><td><code>P13</code></td><td>1/09–2/13</td><td><span class="zh">测试 / Docker / CI-CD / 监控</span><span class="en">Testing / Docker / CI-CD / monitoring</span></td><td><span class="phase-depth depth-eng"><span class="zh">工程</span><span class="en">Eng</span></span></td></tr>
+        <tr><td><code>P12</code></td><td>12/19–1/16</td><td><span class="zh">可靠性 / 安全 / 治理</span><span class="en">Reliability / security / governance</span></td><td><span class="phase-depth depth-eng"><span class="zh">工程</span><span class="en">Eng</span></span></td></tr>
+        <tr><td><code>P13</code></td><td>1/16–2/20</td><td><span class="zh">测试 / Docker / CI-CD（含 eval 门禁）/ 监控</span><span class="en">Testing / Docker / CI-CD (incl. eval gate) / monitoring</span></td><td><span class="phase-depth depth-eng"><span class="zh">工程</span><span class="en">Eng</span></span></td></tr>
       </tbody>
     </table>
   </div>

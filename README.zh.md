@@ -223,8 +223,8 @@ EduPrep 处于**持续、迭代式开发**中。从"RAG 聊天应用"到"知识�
 | **P9** | **GraphRAG** 检索 + 学习路径生成 | 📋 规划 |
 | **P10** | **学习科学引擎** —— 知识追踪 (BKT) + 间隔重复 (FSRS) + 自适应出题 | 📋 规划 |
 | **P11** | **Agent + Tools + MCP** —— LangGraph 编排，EduPrep 作为 MCP server | 📋 规划 |
-| P12 | 性能 / 可靠性 / 安全加固（Redis 缓存、限流、熔断器） | 📋 规划 |
-| P13 | 测试 · Docker · CI/CD · Prometheus + Grafana + Jaeger | 📋 规划 |
+| P12 | 加固：可靠性 / 安全 / **治理**（Redis 缓存、限流、熔断器；模型/prompt 版本管理、回滚、GDPR） | 📋 规划 |
+| P13 | 测试 · Docker · CI/CD（含 **eval 回归门禁**）· Prometheus + Grafana + Jaeger | 📋 规划 |
 
 📍 **完整的双语交互式路线图：** [`docs/roadmap/eduprep_roadmap.html`](./docs/roadmap/eduprep_roadmap.html)
 

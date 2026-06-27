@@ -162,18 +162,28 @@ def slice_by(per_question: list[dict], field: str) -> dict:
 def main() -> None:
     rows = load_dataset(DATASET)
 
-    # First run must ingest; comment out once the PDF is already in ChromaDB
-    ingest_pdfs(rows)
+    # Optional: run only ONE PDF's questions
+    # usage: python eval/run_eval.py --pdf MachineLearning-SimpleClassifiers-NCC.pdf
+    pdf_filter = None
+    if "--pdf" in sys.argv:
+        pdf_filter = sys.argv[sys.argv.index("--pdf") + 1]
+        rows = [r for r in rows if r["pdf"] == pdf_filter]
+        print(f"Filtered to PDF: {pdf_filter}  ({len(rows)} questions)")
 
-    print(f"\nEvaluating {len(rows)} questions (retrieve -> generate -> judge)...")
+    ingest_pdfs(rows)            # only ingests the PDF(s) present in the (filtered) rows
     report = evaluate(rows, K)
 
-    # aggregate answer quality + write docs/evaluation/baseline.md + print scorecard
-    write_baseline_md(report)
+    # Write to a PDF-specific baseline so it doesn't overwrite the existing one
+    if pdf_filter:
+        slug = Path(pdf_filter).stem.lower()[:24]
+        baseline_path = Path(__file__).parents[2] / "docs" / "evaluation" / f"baseline-{slug}.md"
+        write_baseline_md(report, baseline_path)
+    else:
+        write_baseline_md(report)   # combined → docs/evaluation/baseline.md
 
-    # persist the full raw report (now including answer_quality) for later re-runs
     RESULTS_DIR.mkdir(exist_ok=True)
-    out = RESULTS_DIR / f"full_{time.strftime('%Y%m%d_%H%M%S')}.json"
+    tag = Path(pdf_filter).stem if pdf_filter else "all"
+    out = RESULTS_DIR / f"{tag}_{time.strftime('%Y%m%d_%H%M%S')}.json"
     out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Saved raw: {out}")
 

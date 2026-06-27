@@ -1,0 +1,62 @@
+erDiagram
+    user ||--o{ course : "owns"
+    course ||--o{ pdf_file : "contains"
+    pdf_file ||--o{ message : "has"
+    pdf_file ||--o{ note : "has"
+    pdf_file ||--|| memory : "has (1:1)"
+    pdf_file ||--o{ quiz_progress : "has"
+
+    user {
+        integer id PK
+        varchar email UK
+        varchar name
+        varchar password_hash
+        timestamp created_at
+    }
+    course {
+        integer id PK
+        integer user_id FK
+        varchar title
+        timestamp created_at
+    }
+    pdf_file {
+        integer id PK
+        integer course_id FK
+        varchar filename
+        integer chunk_count
+        timestamp created_at
+    }
+    message {
+        integer id PK
+        integer pdf_file_id FK
+        varchar role
+        text content
+        varchar source_type
+        jsonb sources
+        timestamp created_at
+    }
+    note {
+        integer id PK
+        integer pdf_file_id FK
+        varchar type
+        text content
+        timestamp created_at
+    }
+    memory {
+        integer id PK
+        integer pdf_file_id FK,UK
+        jsonb weak_concepts
+        varchar learning_style
+        text history_summary
+        integer last_compressed_at
+        timestamp updated_at
+    }
+    quiz_progress {
+        integer id PK
+        integer pdf_file_id FK
+        integer score
+        integer total
+        float percentage
+        jsonb wrong_questions
+        timestamp created_at
+    }

@@ -223,8 +223,8 @@ EduPrep is under **active, iterative development**. The path from "RAG chat app"
 | **P9** | **GraphRAG** retrieval + learning-path generation | 📋 Planned |
 | **P10** | **Learning-science engine** — knowledge tracing (BKT) + spaced repetition (FSRS) + adaptive quizzing | 📋 Planned |
 | **P11** | **Agent + Tools + MCP** — LangGraph orchestration, EduPrep as an MCP server | 📋 Planned |
-| P12 | Performance / reliability / security hardening (Redis cache, rate limiting, circuit breaker) | 📋 Planned |
-| P13 | Testing · Docker · CI/CD · Prometheus + Grafana + Jaeger | 📋 Planned |
+| P12 | Hardening: reliability / security / **governance** (Redis cache, rate limiting, circuit breaker; model/prompt versioning, rollback, GDPR) | 📋 Planned |
+| P13 | Testing · Docker · CI/CD (incl. **eval regression gate**) · Prometheus + Grafana + Jaeger | 📋 Planned |
 
 📍 **Full interactive bilingual roadmap:** [`docs/roadmap/eduprep_roadmap.html`](./docs/roadmap/eduprep_roadmap.html)
 
