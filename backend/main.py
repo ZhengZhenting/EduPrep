@@ -602,8 +602,6 @@ async def ask_question(request: QuestionRequest,
     }
 
 
-
-
 @app.get("/message/{filename}")
 async def get_messages(filename: str, 
                        course_id: int = 1, 

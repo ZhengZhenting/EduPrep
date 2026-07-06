@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "presentation-static-server",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8766", "--directory", "C:\\Users\\zhent\\Desktop\\BHT\\3.Semester\\Anwendung mit LLM\\Praesentation"],
+      "port": 8766
+    }
+  ]
+}

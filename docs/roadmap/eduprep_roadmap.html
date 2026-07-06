@@ -263,10 +263,16 @@
       <span class="phase-date">07-11 → 08-08 · 4w</span>
     </div>
     <span class="phase-depth depth-multi"><span class="zh">多模态 · 解决纯文字盲区</span><span class="en">Multimodal · fixing the text-only blind spot</span></span>
+    <span style="display:inline-block;margin-left:8px;font-size:12px;padding:2px 9px;border-radius:6px;font-weight:600;background:rgba(210,153,34,.18);color:var(--amber)"><span class="zh">✅ 完成 · 负结果</span><span class="en">✅ Done · negative result</span></span>
     <p class="section-sub" style="margin:10px 0 0">
       <span class="zh">现有 PyPDFLoader 只抽文字层 —— 公式、图解、图片、表格大多丢失或损坏。德语讲义恰恰满是公式图解，这是检索质量的隐形天花板。</span>
       <span class="en">Today's PyPDFLoader only extracts the text layer — formulas, diagrams, images and tables are mostly lost or corrupted. German lecture slides are full of exactly these, making it a hidden ceiling on retrieval quality.</span>
     </p>
+    <div style="background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:10px;padding:12px 16px;margin:12px 0;font-size:13.5px">
+      <strong style="color:var(--amber)"><span class="zh">实测结论：</span><span class="en">Outcome: </span></strong>
+      <span class="zh">整页视觉转写在讲义上<b>净负</b> —— 转写让每页"读起来都像"（<b>同质化</b>），把精确相关页挤出 top-k（NCC/CGG 两份 deck 复现；CGG figure Recall <b>1.00→0.40</b>）。真正的赢点是<b>页眉/页脚剥离</b>：NCC <code>text</code> Recall@5 <b>0.25→0.42</b>、overall 0.47→0.59，与纯文字讲义（Prompting 0.81）差距<b>砍半</b>。已默认关 vision、开页眉剥离、仅对无文字层扫描页保底。视觉价值迁往 <b>P8 概念抽取 / P11 按需工具</b>（`page_triage.py`/`vision_transcribe.py` 保留复用）。详见 <a href="../architecture/multimodal-ingestion.md">multimodal-ingestion.md §8</a>。</span>
+      <span class="en">Full-page vision transcription is <b>net-negative</b> on lecture slides — it <b>homogenizes</b> pages (every page "reads alike"), crowding the exact page out of top-k (replicated on NCC & CGG; CGG figure Recall <b>1.00→0.40</b>). The real win is <b>header/footer stripping</b>: NCC <code>text</code> Recall@5 <b>0.25→0.42</b>, overall 0.47→0.59, <b>halving</b> the gap to the prose deck (Prompting 0.81). Shipped: vision off by default, header-strip on, transcription only as a safety net for text-layer-less scans. Vision's value moves to <b>P8 concept extraction / P11 on-demand tool</b> (`page_triage.py`/`vision_transcribe.py` kept for reuse). See <a href="../architecture/multimodal-ingestion.md">multimodal-ingestion.md §8</a>.</span>
+    </div>
     <div class="phase-grid">
       <div class="phase-col">
         <h5><span class="zh">功能 / 技术</span><span class="en">Features / Tech</span></h5>

@@ -1,0 +1,425 @@
+{
+  "summary": {
+    "k": 5,
+    "n_total": 12,
+    "n_scored": 11,
+    "recall_at_k": 0.5454545454545454,
+    "precision_at_k": 0.1272727272727273,
+    "mrr": 0.4848484848484848
+  },
+  "per_question": [
+    {
+      "id": "cgg-q01",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        2
+      ],
+      "retrieved_pages": [
+        2,
+        3,
+        4,
+        32,
+        17
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "局部光照模型只考虑光源和物体表面某一点的局部信息,不包括间接光照和阴影。而全局光照则追踪所有光线路径,包括物体间的反射和阴影遮挡。",
+      "pages_used": [
+        2,
+        3,
+        4,
+        17,
+        32
+      ],
+      "judge": {
+        "reasoning": "The answer correctly explains that a local illumination model considers only local quantities and the light source at a hit point, excluding indirect illumination and shadows, while global illumination traces all light paths including inter-object reflections and shadows. This is fully supported by pages 2 and 3. The ground truth relevant page is 2; the answer cites 2, 3, 4 correctly (all relevant), but adds 17 and 32 which are about highlights/Blinn-Phong and not relevant to this question.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "cgg-q02",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        11
+      ],
+      "retrieved_pages": [
+        32,
+        1,
+        6,
+        4,
+        12
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "讲义中未找到直接相关内容。",
+      "pages_used": [
+        1,
+        4,
+        6,
+        12,
+        32
+      ],
+      "judge": {
+        "reasoning": "The question asks who introduced the Phong illumination model and in what year. The ground truth is page 11, which is not among the provided sources. Based on the provided sources, there is indeed no information about the inventor or the year, so the answer honestly says the lecture material doesn't contain the relevant content. Given the sources shown, this is faithful and correct. However, since coverage is marked 'standard' and page 11 was the relevant page (not provided here), the correctness relative to the reference is diminished — the answer fails to provide the expected answer, though it cannot given the sources. The citations are broad and don't pinpoint a relevant page.",
+        "correctness": 0.5,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.667
+      }
+    },
+    {
+      "id": "cgg-q03",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        12
+      ],
+      "retrieved_pages": [
+        12,
+        9,
+        6,
+        32,
+        4
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "在Phong模型中,漫反射光的计算公式为:\n\n$$\\vec{L}_{\\text{diffus}} = (\\vec{n} \\cdot \\vec{s}) \\cdot \\vec{k}_d \\odot \\vec{L}$$\n\n其中:\n- $\\vec{n}$ 是表面法向量\n- $\\vec{s}$ 是指向光源的方向向量\n- $\\vec{k}_d$ 是漫反射系数(Albedo)\n- $\\vec{L}$ 是入射光\n- $\\odot$ 表示逐元素相乘\n\n关键点:漫反射光与入射角的余弦值成正比($\\vec{n} \\cdot \\vec{s}$),且与观察方向无关,向所有方向均匀反射。",
+      "pages_used": [
+        4,
+        6,
+        9,
+        12,
+        32
+      ],
+      "judge": {
+        "reasoning": "The answer gives the correct formula and explanation matching page 12 and the reference hint, including the dot product, coefficients, elementwise multiplication, and independence from viewing direction. Faithfulness is fully supported by the sources. Citation includes the key page 12 and relevant page 9, but adds extras (4, 6, 32) that are not relevant to the diffuse formula, warranting a partial citation score.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "cgg-q04",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        14
+      ],
+      "retrieved_pages": [
+        29,
+        31,
+        19,
+        22,
+        18
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "当光源方向从(1,-1,-1)经过(0,0,-1)变化到(-1,-1,-1)时,球体上的高光位置会从右侧逐渐移动到左侧,整体明暗分布也会相应地从右亮左暗过渡到左亮右暗。",
+      "pages_used": [
+        18,
+        19,
+        22,
+        29,
+        31
+      ],
+      "judge": {
+        "reasoning": "The reference indicates the shaded (dark) region always faces away from the light: light from (1,-1,-1) puts the dark area lower-right, light head-on (0,0,-1) gives even lighting with almost no shadow, and light from (-1,-1,-1) moves the dark area to upper-right. The answer describes highlight/brightness moving from right to left, which captures the general left-right shift but incorrectly states the middle position and gets the bright/dark orientation somewhat mixed up (says 右亮左暗 to 左亮右暗) and omits the key point that (0,0,-1) gives nearly uniform illumination with no shadow. Partly correct. The sources given (pages 18,19,22,29,31) concern specular reflection and Phong parameters, not the specific ground-truth page 14; the answer's claims are only loosely supported by these, and the correct page is not cited.",
+        "correctness": 0.5,
+        "faithfulness": 0.5,
+        "citation": 0,
+        "honesty": null,
+        "overall": 0.333
+      }
+    },
+    {
+      "id": "cgg-q05",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        17
+      ],
+      "retrieved_pages": [
+        17,
+        6,
+        19,
+        8,
+        9
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "三个球展示了**高光(Glanzlicht)随相机位置变化而\"移动\"**的现象。\n\n关键点：\n- 每个球在不同位置相对于相机\n- 高光的亮度取决于观察方向$\\vec{v}$\n- 当相机相对物体移动时，高光会在球面上移动\n- 观察方向$\\vec{v}$越偏离理想反射方向$\\vec{r}$，反射光越弱",
+      "pages_used": [
+        6,
+        8,
+        9,
+        17,
+        19
+      ],
+      "judge": {
+        "reasoning": "The answer correctly captures what the three spheres show (highlight/Glanzlicht that varies in brightness with viewing direction and wanders as the camera moves), which matches the ground truth on page 17. The core claims are all supported by page 17, and the extra point about deviation from ideal reflection is supported by page 19. However, the citation includes extra pages (6, 8, 9) that are not directly relevant to this question, and the key page 17 is correctly included but padded with irrelevant citations.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "cgg-q06",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        18
+      ],
+      "retrieved_pages": [
+        18,
+        28,
+        21,
+        19,
+        24
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "根据讲义，Phong模型中的镜面反射项（spekulare Term）公式为：\n\n**L_specular = (⃗r·⃗v)^γ · k_s ⊙ L**\n\n其中：\n- k_s 是镜面反射系数\n- γ 是镜面指数（shininess）\n- ⃗r 是光线在法线上的反射方向\n- ⃗v 是观察方向\n- L 是光源强度\n- ⊙ 表示逐元素相乘",
+      "pages_used": [
+        18,
+        19,
+        21,
+        24,
+        28
+      ],
+      "judge": {
+        "reasoning": "The formula L_specular = (r·v)^γ · k_s ⊙ L matches the source on page 18/19 exactly, with all terms correctly explained. The ground truth page 18 is cited, along with related pages 19 and 21 which are relevant; pages 24 (ambient) and 28 are extraneous but not harmful. Minor citation extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "cgg-q07",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        20
+      ],
+      "retrieved_pages": [
+        8,
+        13,
+        20,
+        20,
+        7
+      ],
+      "recall": 1.0,
+      "precision": 0.4,
+      "rr": 0.3333333333333333,
+      "answer": "这些曲线展示了Phong高光效果:指数γ越大(从1到256),高光区域越窄越集中,产生更尖锐、更聚焦的高光效果。所有曲线在α=0处达到峰值1,但较大的γ值使曲线更快地向0衰减。",
+      "pages_used": [
+        7,
+        8,
+        13,
+        20
+      ],
+      "judge": {
+        "reasoning": "The answer correctly describes that larger gamma produces narrower, more concentrated, sharper highlights, and that all curves peak at 1 at alpha=0 — fully supported by page 20. Faithfulness is strong; all claims are grounded in the sources. Citation includes the correct page 20 but adds extras (7, 8, 13) that are irrelevant to the highlight question.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "cgg-q08",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        23
+      ],
+      "retrieved_pages": [
+        28,
+        12,
+        18,
+        11,
+        34
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "这个等式说明了**每个光源对最终颜色的贡献**。对于每个光源i,都要分别计算它产生的漫反射项(diffus)和镜面反射项(spekular),然后将所有光源的贡献相加,最后再加上环境光项,得到最终的颜色。\n\n简单说:最终颜色 = 环境光 + Σ(每个光源的漫反射 + 每个光源的镜面反射)",
+      "pages_used": [
+        11,
+        12,
+        18,
+        28,
+        34
+      ],
+      "judge": {
+        "reasoning": "The question asks what the image equation 'diffuse plus specular term' illustrates (from page 23), which per the hint shows visually that the final appearance is the sum of a diffuse component and a specular highlight component. The answer instead describes the multi-light-source summation formula from page 28 (ambient + sum of diffuse+specular per light source). This is a different topic; it does not address the specific image-based illustration of diffuse + specular = combined appearance. The claims made are supported by the cited sources but answer the wrong thing. Citation omits page 23 (the actual relevant page) and includes several extras.",
+        "correctness": 0,
+        "faithfulness": 1.0,
+        "citation": 0,
+        "honesty": null,
+        "overall": 0.333
+      }
+    },
+    {
+      "id": "cgg-q09",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        24
+      ],
+      "retrieved_pages": [
+        24,
+        28,
+        12,
+        18,
+        1
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "环境光项(ambiente Term)用于模拟场景中的全局环境光照,它独立于具体光源,为所有物体提供基础亮度,避免完全黑暗的区域。通过调整环境光系数𝑘_a可以改变单个材质的环境光反射,通过调整𝐿_a可以改变整个场景的环境光强度。",
+      "pages_used": [
+        1,
+        12,
+        18,
+        24,
+        28
+      ],
+      "judge": {
+        "reasoning": "The answer correctly explains the ambient term's purpose: simulating global environment light, independent of specific light sources, providing base brightness to avoid completely dark areas, and correctly describes the roles of k_a and L_a. This matches sources on pages 24 and 28. However, the citations include pages 1, 12, and 18, which cover the diffuse and specular terms and direct lighting—these are irrelevant extras beyond the relevant page 24 (and 28).",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "cgg-q10",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        26
+      ],
+      "retrieved_pages": [
+        34,
+        12,
+        24,
+        18,
+        17
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "根据讲义，Phong模型由三部分组成：\n\n**L_phong = L_ambient + Σ(L_diffus,i + L_spekular,i)**\n\n- **环境光项** (ambient): L_ambient = k_a ⊙ L_a\n- **漫反射项** (diffus): L_diffus,i = (n·s_i) · k_d ⊙ L_i  \n- **镜面反射项** (spekular): L_spekular,i = (r_i·v)^γ · k_s ⊙ L_i\n\n对于多个光源，需要对每个光源的漫反射和镜面反射项求和。",
+      "pages_used": [
+        12,
+        17,
+        18,
+        24,
+        34
+      ],
+      "judge": {
+        "reasoning": "The answer correctly describes the Phong model composition as ambient + diffuse + specular, with correct formulas that match the sources. The content is faithful to the sources provided. However, the question specifically asks about how the model is composed according to the figure/illustration (Abbildung) on page 26, showing the visual combination of the three terms. The ground truth relevant page is 26, which is not cited; instead pages 12, 17, 18, 24, 34 are cited. The answer addresses the mathematical composition rather than the illustrative combination shown in the figure, but is still largely correct and on-topic. Citations don't include the ground-truth page 26 and include page 17 which is not among the sources.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "cgg-q11",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        34
+      ],
+      "retrieved_pages": [
+        28,
+        1,
+        5,
+        4,
+        19
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "对于多个光源，Phong模型的扩展方式是：\n\n环境光项保持不变（与具体光源无关），漫反射项和镜面反射项需要对每个光源i分别计算，然后将环境光项和所有光源的贡献相加求和。\n\n公式为：L_total = L_ambient + Σ(L_diffuse,i + L_specular,i)",
+      "pages_used": [
+        1,
+        4,
+        5,
+        19,
+        28
+      ],
+      "judge": {
+        "reasoning": "The answer is factually correct and matches the source on page 28 (ground truth page 34, but the SOURCES label it as 28, consistent with content): ambient term independent, diffuse and specular computed per light source, summed. The formula is correct. However, the citation lists pages 1, 4, 5, 19, 28 — only page 28 is relevant; pages 1, 4, 5, 19 are extraneous, so citation has extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "cgg-q12",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        1,
+        2,
+        5,
+        4,
+        28
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "讲义中未找到直接相关内容。\n\n讲义仅涵盖局部光照模型(Phong模型),不涉及全局光照技术如Photon Mapping。",
+      "pages_used": [
+        1,
+        2,
+        4,
+        5,
+        28
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states that the lecture does not cover Photon Mapping and only deals with local illumination (Phong model), which is consistent with the sources. The claims are supported by the sources (pages describe local illumination models and Phong). The honesty is appropriate as it clearly defers, though the citation of pages is not scored for 'none' coverage.",
+        "correctness": null,
+        "faithfulness": 1.0,
+        "citation": null,
+        "honesty": 1.0,
+        "overall": 1.0
+      }
+    }
+  ],
+  "answer_quality": {
+    "correctness": 0.8181818181818182,
+    "faithfulness": 0.9583333333333334,
+    "citation": 0.4090909090909091,
+    "honesty": 1.0,
+    "overall": 0.74975,
+    "n_judged": 12
+  }
+}

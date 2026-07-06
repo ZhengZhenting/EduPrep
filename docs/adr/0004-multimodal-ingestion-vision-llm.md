@@ -1,8 +1,10 @@
 # ADR-0004: 多模态 Ingestion 选用 Vision-LLM
 
-- **状态 (Status)**: Proposed (P7 规划)
-- **日期 (Date)**: 2026-06-24
-- **关联 (Related)**: [multimodal-ingestion.md](../architecture/multimodal-ingestion.md)(设计与成本)· [ADR-0002 切块](./0002-semantic-chunking.md)
+- **状态 (Status)**: **Reversed（实现并度量后否决为默认）** — 详见 §实测结果与最终决策
+- **日期 (Date)**: 2026-06-24 提出 · 2026-07-07 度量并否决
+- **关联 (Related)**: [multimodal-ingestion.md](../architecture/multimodal-ingestion.md)(设计、成本与实测)· [ADR-0002 切块](./0002-semantic-chunking.md) · [baseline.md](../evaluation/baseline.md)
+
+> **一句话结论**：Vision-LLM 逐页转写在讲义幻灯片上**净负**——讲义标题/图注本就足以检索到正确页，而把整页转写塞进同一检索库会**同质化语料、把精确相关页挤出 top-k**，导致 recall 与 citation 双降。已在两份不同 deck 上复现。默认关闭（`EDUPREP_VISION=0`），仅保留几乎零成本的页眉/页脚剥离。
 
 ---
 
@@ -53,6 +55,45 @@ P7 要让 ingestion "看懂"非文本内容。需要决定**用什么手段把�
 - **新依赖**:PDF→图片渲染库(pymupdf / pdf2image)。
 - **质量非完美**:vision 转写偶有错误,公式复杂时不如 Nougat 精确——若公式场景成为主要瓶颈,再评估引入 Nougat。
 
-## 待验证 (Open / To Measure)
+## 实测结果与最终决策 (Outcome — measured, 2026-07-07)
 
-本决策的"显著提升"目前是预期。**P7 完成后用 P6 的 `content_modality` 标签重跑评测**,量化 `formula`/`figure` 类 recall 相对基线的增益,结果回填 `docs/evaluation/baseline.md`。若 Vision-LLM 在公式上的质量不达标,重新评估 Nougat(本 ADR 标记为待取代的候选,不删除)。
+P7 实现后用 P6 的 `content_modality` 标签，在**两份不同的 deck** 上做了 text-only（`EDUPREP_VISION=0`）vs 多模态的对照实验（同一批 golden 题）。
+
+**实现**：`page_triage.py`（PyMuPDF 廉价信号：字符数 / 图片面积占比 / 矢量路径数 / 数学字体）判定每页走文字还是视觉；`vision_transcribe.py`（`claude-sonnet-4-5`，150 DPI）转写；`pdf_processor.py` 增加 overlay 去重 + 双分支取文字 + 页眉/页脚剥离。转写质量本身很好（满页公式还原成干净 LaTeX）。
+
+**结果（text-only → 多模态）**：
+
+| Deck | 类别 | Recall@5 | Judge overall |
+|---|---|---|---|
+| NCC（公式型 LaTeX，原始题） | formula | 0.556 → 0.556 | 0.85 → 0.77 |
+| | figure | 0.500 → 0.500 | 0.53 → 0.44 |
+| CGG-Phong（图像型 PPT，12 题） | figure | **1.000 → 0.400** | 0.77 → 0.63 |
+
+多模态在两份 deck 上都**没有提升检索、且答案质量下降**（CGG figure recall 直接从满分崩到 0.4）。
+
+**根因（两条）**：
+
+1. **讲义幻灯片"自带文字说明"**：标题 + 图注让 text-only 已能检索到正确页（CGG figure recall = 1.0）。图片不是**检索**的必需品——即便是只有 36 字符的纯图页，也靠标题被检索到。
+2. **转写同质化语料**：所有页转写后都是相似的"公式/球体"描述，向量空间里彼此更像，**真正相关的页被同质化的转写兄弟页挤出 top-k** → recall 与 citation 双降。CGG-q08 讽刺地：转写把页23 挤掉后连标题都丢了，答案反而更差（judge 0.83→0.33）。
+
+**页眉剥离的干净消融**（vision 全关，只切换 header-strip）证明它是**唯一真实的赢点**：
+
+| NCC，vision 全关 | text | overall |
+|---|---|---|
+| 不剥页眉 → 剥页眉 | **0.250 → 0.417 (+0.167)** | 0.471 → 0.588 (+0.117) |
+
+且 **vision 会侵蚀这个收益**：剥页眉的 `text` recall 0.417，一旦开 vision 又被同质化拉回 0.292。与纯文字讲义 Prompting（Recall 0.81）相比，NCC 剥页眉后从 0.41 追到 0.588，差距砍半。
+
+**最终决策**：
+
+- **默认关闭 Vision-LLM**（`EDUPREP_VISION=0`），**保留页眉/页脚剥离**（`ENABLE_HEADER_STRIP=1`，NCC `text` recall 0.25→0.42）。
+- **仅扫描件保底**：只对 `has_text_layer=False` 的页转写（已在 `pdf_processor.py` Pass 1 实现）——这类页文字层为空，转写是唯一内容来源，不与文字竞争 → 不同质化。普通讲义 0 页触发，永不变差。
+
+**视觉的正确用法（未来，铁律：不进检索排序）**：
+
+- **P8 知识图谱**：`vision_transcribe.py` 的转写喂给概念抽取（从图/公式抽概念）——抽实体不是排序找页，无同质化。视觉的价值从 RAG 迁到 KG 层 ⭐
+- **P11 Agent**：`look_at_page` 按需工具，只在某题需要看图时临时调用，ingestion 不转写。
+- **两段式检索**（若 RAG 视觉答题成瓶颈）：先用文字层检索到页，再**仅用该页转写**答题，转写不参与排序。
+- `page_triage.py` / `vision_transcribe.py` **不删**，是上述方向的现成零件。
+
+**元结论**：这次否决**正是 P6 评测基线的价值**——它拦下了一个"我们以为更好、实测更差"的改动，用数据而非直觉做决策。备选方案里的 Nougat / DeepDoc / ColPali 仍作为「真扫描件 + 架构重做」方向的远期候选，不删除。详细数据与同质化机制见 [multimodal-ingestion.md §8](../architecture/multimodal-ingestion.md)。

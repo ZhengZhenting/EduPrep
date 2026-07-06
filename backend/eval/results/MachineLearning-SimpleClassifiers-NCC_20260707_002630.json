@@ -1,0 +1,1273 @@
+{
+  "summary": {
+    "k": 5,
+    "n_total": 37,
+    "n_scored": 34,
+    "recall_at_k": 0.5882352941176471,
+    "precision_at_k": 0.11764705882352941,
+    "mrr": 0.3230392156862745
+  },
+  "per_question": [
+    {
+      "id": "ncc-q01",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        2
+      ],
+      "retrieved_pages": [
+        1,
+        6,
+        10,
+        22,
+        14
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "Nearest Centroid Classifier（最近质心分类器）是一种简单的分类算法。\n\n**工作原理**：\n1. 计算每个类别的质心（均值）µk\n2. 对于新数据点x，计算它到各个质心的距离\n3. 将x分配给距离最近的质心所属的类别\n\n**判断规则**：比较 ∥µ∆− x∥ 和 ∥µo− x∥，选择距离更小的类别。\n\n这是一种线性分类器，适用于数据不相关的情况。",
+      "pages_used": [
+        1,
+        6,
+        10,
+        14,
+        22
+      ],
+      "judge": {
+        "reasoning": "The answer correctly describes the Nearest Centroid Classifier: computing class centroids (means µk), assigning new points to the nearest centroid, and the decision rule comparing distances, all supported by the sources. It also correctly notes it is a linear classifier working well for uncorrelated data (pages 14, 22). All claims are grounded. Citations include the ground-truth relevant page 2 area conceptually but page 2 wasn't provided; cited pages (1,6,10,14,22) all support the claims, though the ground truth only lists page 2 — the core definition on page 6 is cited, which is appropriate.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 1.0,
+        "honesty": null,
+        "overall": 1.0
+      }
+    },
+    {
+      "id": "ncc-q02",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        2
+      ],
+      "retrieved_pages": [
+        10,
+        5,
+        6,
+        13,
+        4
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "讲义中未找到直接相关内容。\n\n讲义主要介绍了NCC的算法原理、计算方法和适用场景，但没有明确列出使NCC具有吸引力的三个特性。",
+      "pages_used": [
+        4,
+        5,
+        6,
+        10,
+        13
+      ],
+      "judge": {
+        "reasoning": "The ground truth answer (easy to implement, fast and memory-efficient, interpretable) is expected on page 2, which was not provided in the SOURCES. Given the provided sources do not contain the three attractive properties, the assistant's claim that this content isn't found is faithful to the provided material. However, the reference hint indicates the answer does exist in the lecture (page 2), so declaring it 'not found' is incorrect relative to the ground truth. Faithfulness is fine since no fabrication occurred. Citations are irrelevant extras since it claims nothing was found.",
+        "correctness": 0,
+        "faithfulness": 1.0,
+        "citation": 0,
+        "honesty": null,
+        "overall": 0.333
+      }
+    },
+    {
+      "id": "ncc-q03",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        3,
+        4
+      ],
+      "retrieved_pages": [
+        1,
+        20,
+        10,
+        26,
+        6
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "原型理论（Prototypentheorie）认为人类通过**类别的中心代表（原型）**来形成抽象概念。在分类新样本时，判断它与哪个类别原型更相似，就将其归为该类。这种思想被应用于最近质心分类器中。",
+      "pages_used": [
+        1,
+        6,
+        10,
+        20,
+        26
+      ],
+      "judge": {
+        "reasoning": "The answer captures the core idea: humans form abstract concepts via prototypes (central representatives of categories) and classify new items by similarity to the closest prototype, linking to nearest centroid classifiers. This is supported by page 6. However, the ground-truth pages are 3 and 4, which are not cited; the answer cites many pages (1, 6, 10, 20, 26) that are mostly irrelevant, and omits the actual relevant pages. The reference hint mentions neurons learning prototypes from nonlinearly filtered sensory input, which is not addressed. Content is faithful to what page 6 states, though incomplete.",
+        "correctness": 0.5,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.667
+      }
+    },
+    {
+      "id": "ncc-q04",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        5
+      ],
+      "retrieved_pages": [
+        1,
+        20,
+        14,
+        10,
+        22
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "在最近质心分类（NCC）中，原型（Prototypes）最简单的定义方式是**计算每个类别的质心（Class Centroids）**，即该类别所有样本的均值：\n\nµk = 1/Nk ∑(i=1 to Nk) xi\n\n其中Nk是第k类的样本数量。",
+      "pages_used": [
+        1,
+        10,
+        14,
+        20,
+        22
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states that prototypes in NCC are most simply defined as the class centroids (class means), matching the reference hint and Page 10's formula. The claim is faithful to the sources (Page 10 gives the exact mean formula). However, the ground-truth relevant page is [5], which is not cited; instead the answer cites many pages (1, 10, 14, 20, 22). Page 10 is the most directly supporting page cited, but the ground-truth page 5 is missing and several cited pages are irrelevant extras, so citation is partial.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q05",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        9
+      ],
+      "retrieved_pages": [
+        10,
+        1,
+        26,
+        4,
+        12
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "**批处理模式(Batch Mode)**：需要所有数据后一次性计算每个类别的中心点，使用公式 µk = (1/Nk)∑xi。\n\n**流式模式(Streaming Mode)**：逐个处理数据点，每来一个新数据就立即更新对应类别的中心点，使用增量更新公式 µk = (Nk/(Nk+1))µk + (1/(Nk+1))xi。\n\n主要区别：批处理需要等待全部数据，流式可以实时处理新到达的数据。",
+      "pages_used": [
+        1,
+        4,
+        10,
+        12,
+        26
+      ],
+      "judge": {
+        "reasoning": "The answer correctly explains the difference: batch computes centroids all at once using all data, streaming updates incrementally per data point, matching sources on pages 10 and 12. Claims are all supported by the sources. However, the citations include irrelevant pages (1, 4, 26) alongside the relevant ones (10, 12), and the ground truth relevant page is 9 while the sources provided use 10 and 12; the answer cited the correct content pages but padded with unrelated ones.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q06",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        13
+      ],
+      "retrieved_pages": [
+        26,
+        4,
+        2,
+        20,
+        13
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.2,
+      "answer": "NCC在特征不相关时效果好，在特征相关或多类别情况下容易失败。\n\n讲义第13页显示：\n- 特征不相关时：NCC works\n- 特征相关时：NCC fails  \n- 3个类别时：NCC fails",
+      "pages_used": [
+        2,
+        4,
+        13,
+        20,
+        26
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states NCC works with uncorrelated features and fails with correlated features or multiple classes, matching page 13 and the reference hint. Claims are supported by page 13. However, the citation includes many extra irrelevant pages (2, 4, 20, 26) alongside the correct page 13.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q07",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        14
+      ],
+      "retrieved_pages": [
+        22,
+        18,
+        24,
+        14,
+        25
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.25,
+      "answer": "NCC是线性分类器因为它的决策边界是特征空间中的一条直线。数学上，NCC的权重向量w等于两个类别均值的差(w = µo - µ∆),决策函数为f(x) = w⊤x - β,这是一个线性函数形式。",
+      "pages_used": [
+        14,
+        18,
+        22,
+        24,
+        25
+      ],
+      "judge": {
+        "reasoning": "The answer correctly explains that NCC is a linear classifier because its decision boundary is a straight line in feature space, matching the ground truth on page 14. The mathematical claims (w = µo - µ∆, f(x) = w⊤x - β) are supported by pages 18 and 22. All claims are grounded in the sources. The citation includes the key page 14 plus supporting pages 18 and 22; pages 24 and 25 are less relevant extras but do relate to linear classification.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 1.0,
+        "honesty": null,
+        "overall": 1.0
+      }
+    },
+    {
+      "id": "ncc-q08",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        21
+      ],
+      "retrieved_pages": [
+        22,
+        20,
+        21,
+        24,
+        18
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.3333333333333333,
+      "answer": "讲义中提到了以下替代线性方法来确定w：\n- Logistic Regression（逻辑回归）\n- Perceptrons（感知机）\n- Support Vector Machines（支持向量机）\n- Ridge Regression（岭回归）\n\n这些方法对\"好的w\"有不同的定义方式。",
+      "pages_used": [
+        18,
+        20,
+        21,
+        22,
+        24
+      ],
+      "judge": {
+        "reasoning": "The answer correctly lists all four alternative linear methods (Logistic Regression, Perceptrons, Support Vector Machines, Ridge Regression) matching the reference hint and page 21 content, and correctly notes they define a good w differently. The citation includes the correct page 21 but adds several extra irrelevant pages (18, 20, 22, 24).",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q09",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        25
+      ],
+      "retrieved_pages": [
+        20,
+        13,
+        6,
+        1,
+        26
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "NCC假设特征之间是**不相关的**（uncorrelated）。\n\n当特征相关时，NCC会失效，如讲义中的例子所示。",
+      "pages_used": [
+        1,
+        6,
+        13,
+        20,
+        26
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states the central assumption that features are uncorrelated, matching the reference hint, and correctly notes NCC fails with correlated features (supported by Page 13). All claims are supported by the sources. However, the citation includes many extraneous pages (1, 6, 20, 26) alongside the actually relevant page 13; the ground truth relevant page is 25 (not in sources, but the supporting content is on Page 13). The citation is padded with irrelevant pages.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q10",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        23
+      ],
+      "retrieved_pages": [
+        22,
+        24,
+        20,
+        3,
+        23
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.2,
+      "answer": "线性分类器在**非线性问题**上会失败。讲义中举例说明：当两类数据无法用一条直线分开时（例如数据呈环形或交错分布），线性分类器就无法正确分类。",
+      "pages_used": [
+        3,
+        20,
+        22,
+        23,
+        24
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states linear classifiers fail on non-linear problems, matching page 23 which says linear classifiers fail on non-linear problems and cannot separate two-class data with a single line. Faithfulness is good—the ring/interleaved example is a reasonable elaboration supported by the source's mention of separating data with a single line. Citation includes page 23 (the ground truth) but adds several irrelevant pages (3, 20, 22, 24), so it has extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q11",
+      "answer_coverage": "standard",
+      "content_modality": "text",
+      "relevant_pages": [
+        26
+      ],
+      "retrieved_pages": [
+        1,
+        20,
+        10,
+        26,
+        6
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.25,
+      "answer": "讲义引用了两个关于原型理论的文献来源：\n1. Posner和Keele (1968)的论文\"On the genesis of abstract ideas\"\n2. Jaekel (2007)的博士论文\"Some Theoretical Aspects of Human Categorization Behaviour: Similarity and Generalization\"",
+      "pages_used": [
+        1,
+        6,
+        10,
+        20,
+        26
+      ],
+      "judge": {
+        "reasoning": "The answer correctly identifies both sources (Jaekel 2007 and Posner & Keele 1968) matching the ground truth on page 26, and both claims are fully supported by the sources. However, the citation includes many extraneous pages (1, 6, 10, 20) beyond the relevant page 26.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q12",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        5
+      ],
+      "retrieved_pages": [
+        12,
+        10,
+        22,
+        5,
+        14
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.25,
+      "answer": "类均值（质心）的数学定义为：\n\n对于第k类，质心 µk = (1/Nk) × Σ(xi)，其中求和遍历该类的所有Nk个数据点。\n\n简单说就是该类所有数据点的算术平均值。",
+      "pages_used": [
+        5,
+        10,
+        12,
+        14,
+        22
+      ],
+      "judge": {
+        "reasoning": "The answer correctly defines the class centroid as the arithmetic mean of all data points in the class, µk = (1/Nk) Σ xi, which matches both the reference hint and pages 5, 10, and 12. Faithfulness is good as this is supported by the sources. Citation includes the relevant page 5 (and 10, 12 which also contain the definition), but adds irrelevant pages 14 and 22 that don't concern the definition, warranting a minor deduction.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q13",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        6
+      ],
+      "retrieved_pages": [
+        6,
+        13,
+        20,
+        5,
+        14
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "NCC根据**欧几里得距离**（Euclidean distance）分配新点x：计算x到各类中心点的距离，哪个类的中心点距离更近，x就属于哪一类。\n\n具体规则：如果 ∥µ∆− x∥>∥µo− x∥，则x属于µo类；否则属于µ∆类。",
+      "pages_used": [
+        5,
+        6,
+        13,
+        14,
+        20
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states the NCC rule: assign x to the nearest centroid using Euclidean distance, with the exact condition ∥µ∆−x∥>∥µo−x∥ → x belongs to µo, otherwise µ∆, matching page 6. All claims are supported by the sources (pages 5 and 6). Citation includes the correct page 6 but adds several extra pages (5, 13, 14, 20) that are not all directly relevant to the distance rule, warranting a slight deduction.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q14",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        7
+      ],
+      "retrieved_pages": [
+        10,
+        7,
+        1,
+        12,
+        11
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.5,
+      "answer": "最近质心分类器(NCC)的预测规则是：\n\n**k* = argmin_k ∥µk − x∥2**\n\n即找到与待分类数据点x距离最近的类质心µk，该质心对应的类别k*就是预测结果。",
+      "pages_used": [
+        1,
+        7,
+        10,
+        11,
+        12
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states the prediction rule k* = argmin_k ||mu_k - x||^2, matching Page 7 and the reference hint. The explanation is faithful to the sources. Citation includes the correct page 7 but adds several irrelevant pages (1, 10, 11, 12), so citation has extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q15",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        11
+      ],
+      "retrieved_pages": [
+        12,
+        5,
+        10,
+        20,
+        9
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "在流式模式下，使用第N个样本更新均值的公式是：\n\n**µk = (Nk/(Nk+1)) · µk + (1/(Nk+1)) · xi**\n\n其中：\n- µk 是第k类的当前均值\n- Nk 是该类当前的样本数\n- xi 是新到达的样本\n- 更新后 Nk = Nk + 1\n\n这个公式将旧均值和新样本加权平均，无需存储所有历史数据。",
+      "pages_used": [
+        5,
+        9,
+        10,
+        12,
+        20
+      ],
+      "judge": {
+        "reasoning": "The formula given matches the streaming update on page 12 (µk = Nk/(Nk+1) µk + 1/(Nk+1) xi), which is equivalent to the reference hint. It's correct and well explained. Faithfulness is good — claims are supported. However, the ground-truth relevant page is 12, and the answer cites 5, 9, 10, 12, 20; the key page 12 is included but with several irrelevant extras (20 is unrelated linear classification).",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q16",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        18
+      ],
+      "retrieved_pages": [
+        22,
+        24,
+        25,
+        23,
+        3
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "线性分类器的一般预测函数为：**w^T x = β**\n\n其中决策边界由 w^T x = 0 定义，当 w^T x > 0 时分为一类，w^T x < 0 时分为另一类。",
+      "pages_used": [
+        3,
+        22,
+        23,
+        24,
+        25
+      ],
+      "judge": {
+        "reasoning": "The question asks for the general prediction function of a linear classifier, which per the hint is f(x) = w^T x - beta. The answer states 'w^T x = β' as the decision boundary and correctly describes the sign-based classification (>0 one class, <0 another). This is essentially correct, though it presents the decision boundary equation rather than the full prediction function f(x) = w^T x - β. The content is grounded in the sources (Page 22 shows w^T x = β, > β, etc.). Citation includes many irrelevant pages (3, 24, 25) and does not cite the ground-truth page 18, though it does include page 22 which contains the relevant content.",
+        "correctness": 0.5,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.667
+      }
+    },
+    {
+      "id": "ncc-q17",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        22
+      ],
+      "retrieved_pages": [
+        18,
+        22,
+        20,
+        24,
+        5
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.5,
+      "answer": "在最近中心点分类器(NCC)中：\n\n**权重w**：两个类别均值的差\nw = µₒ - µ∆\n\n**阈值β**：\nβ = -1/2(µₒᵀµₒ - µ∆ᵀµ∆)\n\n其中µₒ和µ∆分别是两个类别的均值向量。",
+      "pages_used": [
+        5,
+        18,
+        20,
+        22,
+        24
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states w = µₒ - µ∆ and β = -1/2(µₒᵀµₒ - µ∆ᵀµ∆), matching the reference hint and Page 22. Faithful to sources. Citation includes the key page 22 (and 18 which is also relevant) but adds several irrelevant pages (5, 20, 24), so citation has extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q18",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        17
+      ],
+      "retrieved_pages": [
+        22,
+        13,
+        6,
+        10,
+        20
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "通过展开距离不等式 ||x - μ||²，可以得到线性分类器的形式 w^T x - β，其中 w = μ_o - μ_Δ，β = -1/2(μ_o^T μ_o - μ_Δ^T μ_Δ)。这将最近质心分类器转化为线性分类器。",
+      "pages_used": [
+        6,
+        10,
+        13,
+        20,
+        22
+      ],
+      "judge": {
+        "reasoning": "The answer correctly describes that expanding the distance inequality yields the linear form w^T x - β with w = μ_o - μ_Δ and β = -1/2(μ_o^T μ_o - μ_Δ^T μ_Δ), matching the reference hint and the content on pages 20/22. All claims are supported by the sources. However, the ground truth relevant page is 17 (which corresponds to the content shown on pages 20/22 here); the citation includes the correct relevant pages (20, 22) but also adds several extraneous pages (6, 10, 13), so citation has extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q19",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        20
+      ],
+      "retrieved_pages": [
+        20,
+        22,
+        14,
+        8,
+        6
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "通过扩展向量维度来整合β：将原始特征向量x扩展为 x̃ = [1, x]ᵀ，将权重向量w扩展为 w̃ = [-β, w]ᵀ，这样 w̃ᵀx̃ = wᵀx - β，从而将阈值β包含在权重向量中。",
+      "pages_used": [
+        6,
+        8,
+        14,
+        20,
+        22
+      ],
+      "judge": {
+        "reasoning": "The answer correctly describes the augmentation method matching page 20 and the reference hint. All claims are supported by page 20. However, the citation includes many irrelevant pages (6, 8, 14, 22) alongside the correct page 20, so there are extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q20",
+      "answer_coverage": "fuzzy",
+      "content_modality": "formula",
+      "relevant_pages": [
+        11
+      ],
+      "retrieved_pages": [
+        20,
+        21,
+        12,
+        5,
+        10
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "当N非常大时,迭代均值计算可能存在数值稳定性问题。算法中使用 `µk = (Nk/(Nk+1))µk + (1/(Nk+1))xi` 的更新方式,当Nk很大时,`1/(Nk+1)` 会变得非常小,可能导致浮点数精度损失。讲义未直接讨论此数值稳定性问题。",
+      "pages_used": [
+        5,
+        10,
+        12,
+        20,
+        21
+      ],
+      "judge": {
+        "reasoning": "The answer correctly addresses the numerical stability question, noting that with large N the factor 1/(Nk+1) becomes very small and can cause floating-point precision loss, and honestly states the lecture does not directly discuss this. This aligns with the reference hint. The relevant page is 12 (which contains the iterative formula; ground truth says 11 but page 12 in these sources holds Algorithm 3). Citations include 12 but add many irrelevant pages (5, 10, 20, 21), so citation has extras. Claims are supported by the update formula in the sources.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q21",
+      "answer_coverage": "fuzzy",
+      "content_modality": "text",
+      "relevant_pages": [
+        25
+      ],
+      "retrieved_pages": [
+        10,
+        26,
+        1,
+        13,
+        12
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "讲义中未找到直接相关内容。\n\n讲义仅展示了NCC的算法实现（批处理和流式），但没有明确给出时间复杂度和空间复杂度的分析。",
+      "pages_used": [
+        1,
+        10,
+        12,
+        13,
+        26
+      ],
+      "judge": {
+        "reasoning": "The answer honestly states the lecture does not explicitly give complexity analysis, which is largely correct — the reference hint confirms the lecture only qualitatively mentions memory efficiency (D-dimensional centroids) on page 25, without big-O complexity. However, the answer failed to mention the qualitative memory-efficiency statement from page 25 (the true relevant page), and did not cite page 25. The claims made are supported by the shown sources, but the coverage is incomplete and citation misses the ground-truth page.",
+        "correctness": 0.5,
+        "faithfulness": 1.0,
+        "citation": 0,
+        "honesty": null,
+        "overall": 0.5
+      }
+    },
+    {
+      "id": "ncc-q22",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        10,
+        1,
+        26,
+        5,
+        4
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "讲义中未找到直接相关内容。\n\n本讲义主要讲解最近质心分类算法（Nearest Centroid Classification），不涉及支持向量机（SVM）或核技巧（Kernel Trick）的内容。",
+      "pages_used": [
+        1,
+        4,
+        5,
+        10,
+        26
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states that the lecture does not cover the Kernel Trick or SVMs, which aligns with the reference hint. All claims (that the lecture is about Nearest Centroid Classification and does not cover SVM/kernel trick) are supported by the sources. The answer honestly defers by noting the lecture lacks the content, though it could have suggested consulting other resources.",
+        "correctness": null,
+        "faithfulness": 1.0,
+        "citation": null,
+        "honesty": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "id": "ncc-q23",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        1,
+        6,
+        13,
+        20,
+        4
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "讲义中未找到直接相关内容。\n\n本讲义主要讨论最近质心分类器（Nearest Centroid Classifier）和线性分类的基本概念，未涉及逻辑回归的损失函数。",
+      "pages_used": [
+        1,
+        4,
+        6,
+        13,
+        20
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states that the lecture does not contain the logistic regression loss function, which matches the guidance that the lecture doesn't cover it. All claims (about NCC and linear classification being the topics) are supported by the sources. It honestly defers rather than fabricating a loss function.",
+        "correctness": null,
+        "faithfulness": 1.0,
+        "citation": null,
+        "honesty": 1.0,
+        "overall": 1.0
+      }
+    },
+    {
+      "id": "ncc-q24",
+      "answer_coverage": "none",
+      "content_modality": "text",
+      "relevant_pages": [],
+      "retrieved_pages": [
+        10,
+        7,
+        12,
+        1,
+        14
+      ],
+      "recall": null,
+      "precision": null,
+      "rr": null,
+      "answer": "NCC（最近质心分类器）与k-NN的主要区别：\n\n1. **代表点不同**：NCC使用每个类别的质心（均值点）作为代表；k-NN使用所有训练数据点。\n\n2. **预测方式**：NCC将新样本分配给最近的质心所属类别；k-NN根据k个最近邻居的多数投票决定类别。\n\n3. **计算效率**：NCC只需存储K个质心，预测时计算K次距离；k-NN需存储所有训练数据，预测时计算N次距离。\n\n4. **决策边界**：NCC产生线性决策边界；k-NN可产生非线性决策边界。",
+      "pages_used": [
+        1,
+        7,
+        10,
+        12,
+        14
+      ],
+      "judge": {
+        "reasoning": "The lecture only covers NCC and never mentions k-NN or any comparison. The answer provides substantive claims about k-NN (majority voting, storing all points, non-linear boundaries) that are NOT in the sources—these are fabricated relative to the provided material. The NCC parts (centroids, linear boundary) are supported, but the k-NN contrasts are unsupported extensions. The answer also fails to acknowledge that the lecture doesn't cover k-NN, instead presenting the comparison as if grounded in the lecture and citing pages.",
+        "correctness": null,
+        "faithfulness": 0,
+        "citation": null,
+        "honesty": 0,
+        "overall": 0.0
+      }
+    },
+    {
+      "id": "ncc-q25",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        13
+      ],
+      "retrieved_pages": [
+        1,
+        13,
+        10,
+        20,
+        14
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.5,
+      "answer": "这三个散点图展示了NCC（最近质心分类器）在不同数据分布下的表现：\n\n1. **无相关特征**：NCC有效\n2. **相关特征**：NCC失效\n3. **三类情况**：NCC失效\n\n结论：NCC仅在特征不相关时表现良好，当特征相关或类别增多时效果不佳。",
+      "pages_used": [
+        1,
+        10,
+        13,
+        14,
+        20
+      ],
+      "judge": {
+        "reasoning": "The answer correctly describes the three scatter plots: NCC works with uncorrelated features, fails with correlated features, and fails with 3 classes — matching page 13 exactly. All claims are supported by the sources (page 13 and page 14). Citation includes the correct page 13 but adds several irrelevant pages (1, 10, 20), which are extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q26",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        4
+      ],
+      "retrieved_pages": [
+        4,
+        10,
+        13,
+        12,
+        5
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "玩具数据示例的结构如下：\n- 二维输入空间 x ∈ ℝ²（两个特征维度 x₁ 和 x₂）\n- 两个类别的数据点，分别用三角形（∆）和圆圈（◦）表示\n\n这是用来演示原型分类概念的简单示例。",
+      "pages_used": [
+        4,
+        5,
+        10,
+        12,
+        13
+      ],
+      "judge": {
+        "reasoning": "The answer correctly describes the toy data example: two-dimensional input x∈R² with features x1 and x2, and two classes represented by triangles (∆) and circles (◦), fully matching page 4. All claims are supported by the sources. However, the citation includes pages 4 and 5 (relevant) but also 10, 12, 13, which are extraneous and unrelated to the toy data example.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q27",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        23
+      ],
+      "retrieved_pages": [
+        1,
+        23,
+        2,
+        6,
+        26
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.5,
+      "answer": "因为这两个数据集是非线性可分的。数据点的分布使得无法用一条直线将两类完全分开，需要曲线或更复杂的决策边界才能正确分类。",
+      "pages_used": [
+        1,
+        2,
+        6,
+        23,
+        26
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states the data are non-linearly separable and cannot be split by a single line, matching the reference and page 23. Claims are supported by page 23. However, citation includes many extra irrelevant pages (1, 2, 6, 26) alongside the correct page 23, so citation is partial.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q28",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        24
+      ],
+      "retrieved_pages": [
+        1,
+        20,
+        10,
+        21,
+        12
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "讲义中未找到直接相关内容。提供的内容仅包含线性分类和最近质心分类算法,没有关于Folie 24或非线性内容的说明。",
+      "pages_used": [
+        1,
+        10,
+        12,
+        20,
+        21
+      ],
+      "judge": {
+        "reasoning": "The ground truth indicates page 24 illustrates making non-linearly-separable data linearly separable via constructing new features x̃. However, page 24 is not among the provided sources, so the answer cannot ground itself in the actual relevant page. Given the available sources, the answer honestly states the material about slide 24 / non-linearity is not found, which is a reasonable response given page 24 is absent. But the answer_coverage is 'standard', meaning the content should be answerable — the assistant failed to provide the correct answer. Faithfulness is fine (no fabrication), but correctness is wrong (it did not answer the question) and citations do not include the relevant page 24.",
+        "correctness": 0,
+        "faithfulness": 1.0,
+        "citation": 0,
+        "honesty": null,
+        "overall": 0.333
+      }
+    },
+    {
+      "id": "ncc-q29",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        20
+      ],
+      "retrieved_pages": [
+        20,
+        21,
+        22,
+        17,
+        26
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "权重向量 w 与决策边界垂直(正交)。\n\n从讲义中可以看到,决策边界定义为 w⊤x = β(或 w⊤x = 0 的形式),这是一个超平面。向量 w 是该超平面的法向量,因此垂直于决策边界。",
+      "pages_used": [
+        17,
+        20,
+        21,
+        22,
+        26
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states that w is perpendicular (normal) to the decision boundary, which matches the reference hint and is supported by the geometric figure showing w orthogonal to the w^T x = β hyperplane. The claim about w being the normal vector is faithful to the sources. Citation includes the ground-truth page 20, but also adds several extra pages (17, 21, 22, 26), some irrelevant (26 is references), warranting a partial citation score.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q30",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        13
+      ],
+      "retrieved_pages": [
+        1,
+        10,
+        5,
+        6,
+        20
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "讲义中未找到直接相关内容。\n\n提供的讲义片段只包含NCC算法的基本原理和线性分类的内容,但没有包含Folie 13(第13页)的具体数据配置图示。无法回答在哪种配置下NCC有效。",
+      "pages_used": [
+        1,
+        5,
+        6,
+        10,
+        20
+      ],
+      "judge": {
+        "reasoning": "The question asks specifically about slide 13's three data configurations, but page 13 was not included in the provided sources. The answer honestly states the lecture excerpts don't contain slide 13's content and declines to answer, which is faithful to what's given. However, since answer_coverage is 'standard', the ground truth expects an actual answer (only the uncorrelated-features configuration works because the perpendicular bisector of the centroids separates the classes). The answer fails to provide the correct content. Citations are irrelevant/wrong since page 13 was not cited (though it wasn't available). Faithfulness is fine as no fabrication occurs.",
+        "correctness": 0,
+        "faithfulness": 1.0,
+        "citation": 0,
+        "honesty": null,
+        "overall": 0.333
+      }
+    },
+    {
+      "id": "ncc-q31",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        10
+      ],
+      "retrieved_pages": [
+        10,
+        12,
+        7,
+        13,
+        5
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "批处理算法（算法2）通过公式 µk = 1/Nk ∑(i=1 to Nk) xi 计算类均值，即将属于类别k的所有数据点求和后除以该类别的样本数量Nk。",
+      "pages_used": [
+        5,
+        7,
+        10,
+        12,
+        13
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states the batch algorithm computes mu_k as the sum of all N_k data points in class k divided by N_k, matching page 10. The formula is faithful to the source. However, the citation includes many extra pages (5, 7, 12, 13) beyond the relevant page 10, though page 10 is included.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q32",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        12
+      ],
+      "retrieved_pages": [
+        12,
+        10,
+        7,
+        5,
+        1
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 1.0,
+      "answer": "在流式算法（Algorithm 3）中，当新数据点 x_i 到达且 k = y_i 时，迭代更新规则为：\n\n**µk = (Nk/(Nk+1)) · µk + (1/(Nk+1)) · xi**\n\n其中 Nk 是类别 k 当前的样本数量，更新后 Nk 会加1。\n\n这个公式将旧的类中心 µk 和新数据点 xi 进行加权平均更新。",
+      "pages_used": [
+        1,
+        5,
+        7,
+        10,
+        12
+      ],
+      "judge": {
+        "reasoning": "The update rule is correct and matches page 12 exactly. All claims are supported by the sources. However, the citation includes many extra pages (1, 5, 7, 10) that are not relevant; only page 12 is the relevant page.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q33",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        20
+      ],
+      "retrieved_pages": [
+        22,
+        20,
+        18,
+        6,
+        3
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.5,
+      "answer": "根据讲义内容，线性分类规则通过 w^T x - β 的符号判断类别归属：\n\n- 当 w^T x - β > 0 时，x 属于类别 o\n- 当 w^T x - β < 0 时，x 属于类别 ∆\n\n其中 w 定义决策边界，β 定义决策阈值。",
+      "pages_used": [
+        3,
+        6,
+        18,
+        20,
+        22
+      ],
+      "judge": {
+        "reasoning": "The answer correctly states the decision rule: positive sign means class o, negative means class Delta, matching page 20. The additional claims about w defining the boundary and beta the threshold are supported by page 18. All content is faithful. Citation includes the correct page 20, but adds several irrelevant pages (3, 6) not directly related to the decision rule, so citation has extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q34",
+      "answer_coverage": "standard",
+      "content_modality": "formula",
+      "relevant_pages": [
+        24
+      ],
+      "retrieved_pages": [
+        23,
+        22,
+        24,
+        14,
+        18
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.3333333333333333,
+      "answer": "讲义中未找到直接相关内容。讲义只提到\"如果我们能建模非线性关系，就可以创建新特征 ˜x 使其线性可分\"，但没有说明具体的特征转换方法。",
+      "pages_used": [
+        14,
+        18,
+        22,
+        23,
+        24
+      ],
+      "judge": {
+        "reasoning": "The source (Page 24) only states that new features x_tilde can be created if the non-linearity can be modeled, but does not specify the concrete transformation (like x^T x). The answer correctly identifies that the lecture does not give the specific transformation method, which is honest and faithful to the sources. The reference hint's specific formula is not actually present in the provided sources, so the answer's honesty is justified. However, the answer_coverage is marked 'standard' with ground truth page 24, so correctness and citation apply. The answer partially addresses the question by noting what the lecture does say, but claims no relevant content exists—which is partly true given the lack of a concrete formula in the sources. Citation includes page 24 plus several irrelevant extras.",
+        "correctness": 0.5,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.667
+      }
+    },
+    {
+      "id": "ncc-q35",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        6
+      ],
+      "retrieved_pages": [
+        22,
+        10,
+        6,
+        1,
+        20
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.3333333333333333,
+      "answer": "散点图展示了两类数据点（圆圈○和三角形△），以及它们各自的质心（类均值）μ_o 和 μ_Δ。这是最近质心分类器的可视化：通过比较新数据点与两个质心的距离来判断它属于哪一类。",
+      "pages_used": [
+        1,
+        6,
+        10,
+        20,
+        22
+      ],
+      "judge": {
+        "reasoning": "The answer correctly describes the scatter plot: two classes of points (circles/triangles) with their respective centroids mu_o and mu_Delta, and explains the nearest centroid classification by comparing distances, matching the reference and page 6. Faithful to sources. However, the citation includes pages 1, 10, 20, 22 in addition to the relevant page 6, so there are extra citations beyond the ground-truth page.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q36",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        21
+      ],
+      "retrieved_pages": [
+        22,
+        20,
+        18,
+        6,
+        5
+      ],
+      "recall": 0.0,
+      "precision": 0.0,
+      "rr": 0.0,
+      "answer": "该图展示了线性分类器的决策边界：\n\n- **决策边界**：w^T x = β 是分隔两类的直线\n- **分类区域**：\n  - w^T x > β 的区域属于类别 o\n  - w^T x < β 的区域属于类别 ∆\n- **几何意义**：向量 w 垂直于决策边界，指向类别 o 的方向；β 控制边界的位置\n\n这是最近质心分类器(NCC)的可视化，其中 w = µo - µ∆。",
+      "pages_used": [
+        5,
+        6,
+        18,
+        20,
+        22
+      ],
+      "judge": {
+        "reasoning": "The answer correctly describes the figure: decision boundary w^T x = β, region w^T x > β belongs to class o and < β to class ∆, and w perpendicular to the boundary — all supported by pages 20/22/18. The claim that w points toward class o is reasonable given w = µo - µ∆. Faithful to sources. Citations include the relevant page (ground truth 21, which corresponds to source pages 20/22 given numbering offset) plus extra supporting pages; the core relevant page is cited, but with several extras.",
+        "correctness": 1.0,
+        "faithfulness": 1.0,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.833
+      }
+    },
+    {
+      "id": "ncc-q37",
+      "answer_coverage": "standard",
+      "content_modality": "figure",
+      "relevant_pages": [
+        5
+      ],
+      "retrieved_pages": [
+        22,
+        10,
+        5,
+        6,
+        1
+      ],
+      "recall": 1.0,
+      "precision": 0.2,
+      "rr": 0.3333333333333333,
+      "answer": "讲义中未找到直接相关内容。第5页只显示了计算类均值μ_Δ和μ_o的公式,以及距离计算公式,但没有提到散点图的具体内容。",
+      "pages_used": [
+        1,
+        5,
+        6,
+        10,
+        22
+      ],
+      "judge": {
+        "reasoning": "The reference indicates slide 5 shows a scatter plot with two data classes (circles and triangles) and their centroid prototypes mu_o and mu_Delta. The answer claims no scatter plot content is shown and denies the lecture has relevant info, which contradicts the ground truth. The provided source text for page 5 doesn't explicitly mention the scatter plot, but the answer is incorrect per the reference. Faithfulness to the extracted text is acceptable but the conclusion is wrong. Citation includes page 5 but with many extras and a wrong overall conclusion.",
+        "correctness": 0,
+        "faithfulness": 0.5,
+        "citation": 0.5,
+        "honesty": null,
+        "overall": 0.333
+      }
+    }
+  ],
+  "answer_quality": {
+    "correctness": 0.8235294117647058,
+    "faithfulness": 0.9594594594594594,
+    "citation": 0.47058823529411764,
+    "honesty": 0.6666666666666666,
+    "overall": 0.7520270270270271,
+    "n_judged": 37
+  }
+}
