@@ -12,13 +12,14 @@ from concurrent.futures import ThreadPoolExecutor
 from sqlalchemy.orm import Session
 from wasabi import msg
 from observability import langfuse, logger, generate_request_id
+from concept_extraction import extract_concepts, merge_into_graph, link_cross_pdf
 
 
 from pdf_processor import process_pdf
 from rag import store_chunks, search_chunks, search_chunks_with_score
 from memory import load_memory, save_memory, compress_history, update_memory, should_compress, load_quiz_memory, save_quiz_memory
 from database import get_db, SessionLocal
-from models import User, Course, PdfFile, Message, Note, Memory, QuizProgress
+from models import User, Course, PdfFile, Message, Note, Memory, QuizProgress, Concept, ConceptEdge
 from tools import search_web
 from auth import (
     hash_password, verify_password,
@@ -265,6 +266,16 @@ def process_pdf_background(content:bytes, filename:str, pdf_file_id: int):
             "pdf_file_id": pdf_file_id
             }
         print(f"PDF processing complete: {filename}, {len(chunks)} chunks")
+
+        # 自动抽取概念并入课程知识图谱（单独 try，失败不影响上传）
+        try:
+            if pdf_file:
+                extracted = extract_concepts(filename)
+                nc, ne = merge_into_graph(pdf_file.course_id, pdf_file_id, extracted, db)
+                ncross = link_cross_pdf(pdf_file.course_id, pdf_file_id, db)
+                print(f"Knowledge graph updated: +{nc} concepts, +{ne} edges, +{ncross} cross-PDF edges ({filename})")
+        except Exception as ke:
+            print(f"Concept extraction failed (upload still OK): {ke}")
 
     except Exception as e:
         print(f"Error occurred while processing PDF: {e}")
@@ -1173,3 +1184,34 @@ async def delete_course(course_id: int,
     db.commit()
 
     return {"message": "Course deleted successfully"}
+
+@app.get("/courses/{course_id}/graph")
+async def get_course_graph(course_id: int,
+                           db: Session = Depends(get_db),
+                           current_user: User = Depends(get_current_user)):
+    # 验证课程归属（和其它端点一致）
+    course = db.query(Course).filter(
+        Course.id == course_id, Course.user_id == current_user.id
+    ).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    concepts = db.query(Concept).filter(Concept.course_id == course_id).all()
+    edges = db.query(ConceptEdge).filter(ConceptEdge.course_id == course_id).all()
+
+    nodes = [{
+        "id": c.id,
+        "name": c.name,
+        "description": c.description,
+        "sources": [r.get("pdf_file_id") for r in (c.source_refs or [])],  # 来自哪些 PDF
+    } for c in concepts]
+
+    edge_list = [{
+        "from": e.from_concept_id,
+        "to": e.to_concept_id,
+        "type": e.relation_type,
+        "weight": e.weight,
+    } for e in edges]
+
+    return {"course_id": course_id, "nodes": nodes, "edges": edge_list}
+

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Float, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Text, Float, DateTime, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -28,6 +28,10 @@ class Course(Base):
 
     user = relationship("User", back_populates="courses")
     pdf_files = relationship("PdfFile", back_populates="course", cascade="all, delete-orphan")
+    concepts = relationship("Concept", back_populates="course", cascade="all, delete-orphan")
+    concept_edges = relationship("ConceptEdge", back_populates="course", cascade="all, delete-orphan")
+    concept_masteries = relationship("ConceptMastery", back_populates="course", cascade="all, delete-orphan")
+    learning_paths=relationship("LearningPath", back_populates="course", cascade="all, delete-orphan")
 
 
 class PdfFile(Base):
@@ -98,3 +102,69 @@ class QuizProgress(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     pdf_file = relationship("PdfFile", back_populates="quiz_progress")
+
+class Concept(Base):
+    __tablename__ = "concept"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    course_id = Column(Integer, ForeignKey("course.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(200), nullable=False)
+    description = Column(Text)
+    attributes = Column(JSONB, default=dict)  # Store additional attributes as JSON
+    embedding = Column(JSONB)  # Store embedding as JSON array，PostgreSQL 的一种数据类型，JSON 的二进制存储格式
+    source_refs= Column(JSONB, default=list)  # Store source references as JSON array
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    #UniqueConstraint 在数据库层强制"某几列的组合不能重复"(复合唯一约束)
+    __table_args__ = (UniqueConstraint("course_id", "name", name="uq_concept_course_name"),)
+
+    #back_populates 把一段关系的"两头"绑在一起,让双向导航自动同步
+    course = relationship("Course", back_populates="concepts")
+    masteries = relationship("ConceptMastery", back_populates="concept", cascade="all, delete-orphan")
+
+class ConceptEdge(Base):
+    __tablename__ = "concept_edge"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    course_id = Column(Integer, ForeignKey("course.id", ondelete="CASCADE"), nullable=False)
+    from_concept_id = Column(Integer, ForeignKey("concept.id", ondelete="CASCADE"), nullable=False)
+    to_concept_id = Column(Integer, ForeignKey("concept.id", ondelete="CASCADE"), nullable=False)
+    relation_type = Column(String(100), nullable=False)  # e.g., "prerequisite", "related_to"
+    weight= Column(Float, default=1.0)  # Optional weight for the relationship
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint("from_concept_id", "to_concept_id", "relation_type", name="uq_concept_edge"),
+    )
+
+    course = relationship("Course", back_populates="concept_edges")
+    from_concept = relationship("Concept", foreign_keys=[from_concept_id])
+    to_concept = relationship("Concept", foreign_keys=[to_concept_id])
+
+class ConceptMastery(Base):
+    __tablename__ = "concept_mastery"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    course_id = Column(Integer, ForeignKey("course.id", ondelete="CASCADE"), nullable=False)
+    concept_id = Column(Integer, ForeignKey("concept.id", ondelete="CASCADE"), nullable=False)
+    mastery_prob = Column(Float, default=0.0)  # 掌握概率 [0,1]，BKT 更新
+    last_review = Column(DateTime)
+    next_review = Column(DateTime) 
+    fsrs_state= Column(JSONB) 
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (UniqueConstraint("concept_id", "course_id", name="uq_concept_mastery"),)
+
+    course = relationship("Course", back_populates="concept_masteries")
+    concept = relationship("Concept", back_populates="masteries")
+
+class LearningPath(Base):
+    __tablename__ = "learning_path"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    course_id = Column(Integer, ForeignKey("course.id", ondelete="CASCADE"), nullable=False)
+    ordered_concept_ids = Column(JSONB, default=list)  # Store ordered concept IDs as JSON array 拓扑排序后的概念 id 列表
+    generated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    course = relationship("Course", back_populates="learning_paths")

@@ -4,7 +4,10 @@ from sqlalchemy import pool
 from alembic import context
 from dotenv import load_dotenv
 from database import Base, DATABASE_URL
-from models import User, Course, PdfFile, Message, Note, Memory, QuizProgress
+from models import (
+    User, Course, PdfFile, Message, Note, Memory, QuizProgress,
+    Concept, ConceptEdge, ConceptMastery, LearningPath,
+)
 import os
 import sys
 

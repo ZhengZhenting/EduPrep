@@ -1,9 +1,12 @@
 # 知识图谱数据库 Schema 设计
 
-> **状态**: Draft (P7 设计文档)
-> **更新**: 2026-06-20
+> **状态**: **Implemented（4 张表已迁移、字段已投入使用）**
+> **更新**: 2026-06-20 设计 → 2026-07-07 修订 → 2026-07-08 迁移执行 + 实测
 > **作者**: EduPrep Team
-> **关联文档**: [retrieval-flow.md](./retrieval-flow.md) · [concept-extraction-pipeline.md](./concept-extraction-pipeline.md) · ADR-0003 (图存储选型) · ADR-0004 (GraphRAG)
+> **关联文档**: [concept-extraction-pipeline.md](./concept-extraction-pipeline.md)（抽取流程 + 关系/语言/属性决策 + §9 实测校准）· retrieval-flow.md（待写，P9）· [ADR-0005](../adr/0005-vector-storage-jsonb-vs-pgvector.md)（图存储选型：JSONB，已定）· ADR-0006 (GraphRAG，待写，P9)
+>
+> ⚠️ **P8 设计更新 (2026-07-07)**：关系类型、概念语言、属性字段已修订（本文相关处已更新）；决策依据与标准出处见 [concept-extraction-pipeline.md](./concept-extraction-pipeline.md)。
+> ✅ **P8 实现更新 (2026-07-08)**：4 张表已通过 Alembic 迁移建成；`concept.embedding` 已按 [ADR-0005](../adr/0005-vector-storage-jsonb-vs-pgvector.md) 定为 JSONB 并在建概念时即填充；`concept_edge.weight` 已用于存储跨 PDF 边的余弦相似度。
 
 ---
 
@@ -63,15 +66,17 @@ memory  (id, pdf_file_id FK→pdf_file UK, weak_concepts JSONB,  ← 迁移到 c
 |---|---|---|
 | `id` | Integer PK | |
 | `course_id` | Integer FK→course (CASCADE) | 课程级归属 |
-| `name` | String(200) | 概念名（主语言，默认英文/中文） |
-| `name_de` | String(200), nullable | 德语术语对照（接现有 vocabulary 能力） |
-| `description` | Text, nullable | 概念简述（Claude 抽取生成） |
-| `embedding` | JSONB / pgvector, nullable | 概念向量，用于实体消歧时的相似度比对 |
+| `name` | String(200) | 概念规范名 = **德语（源语言）**，唯一标识 + 消歧匹配键（见下方语言决策） |
+| `description` | Text, nullable | 概念简述（Claude 抽取生成，德语） |
+| `attributes` | JSONB, nullable | **灵活属性扩展口**：静态学科属性（定义/公式/考点…）按需填；动态属性（难点/易错点）不存此处，由 P10 学习者模型算。**当前尚未填充**（P8 垂直切片未用到，留待具体功能需要时再抽） |
+| `embedding` | **JSONB**（已定，见 [ADR-0005](../adr/0005-vector-storage-jsonb-vs-pgvector.md)），nullable | 概念向量（`"name: description"` 文本算，Ollama `nomic-embed-text`，768 维），**建概念时即计算填充**；消歧/跨PDF 用 Python 原生余弦比对（无需 pgvector，规模小） |
 | `source_refs` | JSONB | 来源列表 `[{pdf_file_id, chunk_ids:[...]}]`，**支持跨 PDF** |
 | `created_at` | DateTime | |
 | `updated_at` | DateTime | 增量合并时更新 |
 
 唯一约束建议：`(course_id, name)` 软唯一（消歧后保证课程内概念名不重复）。
+
+> **语言决策（2026-07-07）**：概念名**统一存德语（材料源语言）**，删除原 `name_de` 列（name 已是德语，冗余）。中文/英文在**输出时翻译**，不入库。理由：实体消歧需在同一语言空间比对（存翻译会导致假合并/假分裂），且德语术语本身是考试所需。遵循 SKOS `prefLabel`（源语言）+ 输出层 `altLabel` 模式。详见 [concept-extraction-pipeline.md §3](./concept-extraction-pipeline.md)。
 
 ### 3.2 `concept_edge` — 概念间关系边
 
@@ -81,20 +86,22 @@ memory  (id, pdf_file_id FK→pdf_file UK, weak_concepts JSONB,  ← 迁移到 c
 | `course_id` | Integer FK→course (CASCADE) | 冗余存课程，便于按课程整图查询 |
 | `from_concept_id` | Integer FK→concept (CASCADE) | |
 | `to_concept_id` | Integer FK→concept (CASCADE) | |
-| `relation_type` | String(20) | `prerequisite` / `related` / `part_of` / `equivalent_de` |
-| `weight` | Float, default 1.0 | 关系强度（用于检索扩展排序、路径权重） |
+| `relation_type` | String(20) | `is_a` / `prerequisite` / `part_of` / `related` |
+| `weight` | Float, default 1.0 | 关系强度。**PDF 内部抽取的边**：默认 1.0；**跨 PDF 推理的边**（§6.5）：存该概念对的**余弦相似度**（用于以后按权重过滤弱 `related`，见 concept-extraction-pipeline.md §8） |
 | `created_at` | DateTime | |
 
 唯一约束：`(from_concept_id, to_concept_id, relation_type)` 防重复边。
 
-**关系类型语义**：
+**关系类型语义**（4 条，标准对照与决策依据见 [concept-extraction-pipeline.md §2](./concept-extraction-pipeline.md)）：
 
-| relation_type | 含义 | 用途 |
-|---|---|---|
-| `prerequisite` | from 是 to 的先修 | 学习路径拓扑排序 |
-| `related` | 相关/共现 | GraphRAG 检索扩展 |
-| `part_of` | from 属于主题 to | 图谱分层/聚类 |
-| `equivalent_de` | 德语术语等价 | 双语对照 |
+| relation_type | 含义 | 标准出处 | 用途 |
+|---|---|---|---|
+| `is_a` | from 是 to 的子类/下位概念 | `rdfs:subClassOf` / ConceptNet `IsA` / WordNet 上下位 | 分层聚类、知识脉络 |
+| `prerequisite` | from 是 to 的先修 | ConceptNet `HasPrerequisite` | 学习路径拓扑排序 |
+| `part_of` | from 是 to 的组成部分 | SKOS `broader`/`narrower` / ConceptNet `PartOf` | 整体-部分（知识点→小考点） |
+| `related` | 一般相关/共现 | SKOS `related` / ConceptNet `RelatedTo` | GraphRAG 检索扩展 |
+
+> **变更（2026-07-07）**：**新增 `is_a`**（教育概念脉络主要靠上下位，且与 `part_of` 语义不同）；**删除 `equivalent_de`**（它不是概念间关系，而是同一概念的德语名 = SKOS `altLabel`，已随"概念名统一存德语"消解）；学科特殊关系（`互斥`/`因果`）需领域专家精修，暂缓入 backlog。
 
 ### 3.3 `concept_mastery` — 课程级学习者模型
 
@@ -151,34 +158,40 @@ erDiagram
     concept     ||..o{ pdf_file        : "source_refs (JSONB, cross-PDF)"
 
     concept {
-        int id PK
-        int course_id FK
-        string name
-        string name_de
+        integer id PK
+        integer course_id FK
+        varchar name "德语规范名"
         text description
+        jsonb attributes
         jsonb embedding
         jsonb source_refs
+        timestamp created_at
+        timestamp updated_at
     }
     concept_edge {
-        int id PK
-        int course_id FK
-        int from_concept_id FK
-        int to_concept_id FK
-        string relation_type
-        float weight
+        integer id PK
+        integer course_id FK
+        integer from_concept_id FK
+        integer to_concept_id FK
+        varchar relation_type
+        float8 weight
+        timestamp created_at
     }
     concept_mastery {
-        int id PK
-        int course_id FK
-        int concept_id FK
-        float mastery_prob
-        datetime next_review
+        integer id PK
+        integer course_id FK
+        integer concept_id FK
+        float8 mastery_prob
+        timestamp last_review
+        timestamp next_review
         jsonb fsrs_state
+        timestamp updated_at
     }
     learning_path {
-        int id PK
-        int course_id FK
+        integer id PK
+        integer course_id FK
         jsonb ordered_concept_ids
+        timestamp generated_at
     }
 ```
 
@@ -187,6 +200,8 @@ erDiagram
 ---
 
 ## 5. 迁移方案 (Alembic)
+
+> ✅ **Step 1（建表）已执行**（2026-07-08）：`alembic revision --autogenerate` + `alembic upgrade head`，4 张表迁移成功，与现有 7 张表共存无冲突。**Step 2（`weak_concepts` 数据迁移脚本）尚未执行**——当前概念数据完全来自 P8 抽取流水线（§6），不是从旧 `weak_concepts` 迁移而来；`memory.weak_concepts` 仍保留、未标记生效的 deprecated 迁移。
 
 ### 5.1 迁移目标
 
@@ -250,16 +265,21 @@ alembic upgrade head
 | `models.py` | 新增 4 个 ORM 类；`Course` 增加 4 个 relationship；`Memory.weak_concepts` 标记 deprecated |
 | `memory.py` | 读取薄弱概念的逻辑从 `memory.weak_concepts` 改为查询 `concept_mastery`（课程级） |
 | `main.py /quiz` | 出题时按 `course_id` 读 `concept_mastery` 而非按 filename 读 weak_concepts |
-| `rag.py` | 新增 GraphRAG 检索分支（P8）：命中概念后按 `concept_edge` 扩展取 chunk |
+| `rag.py` | 新增 GraphRAG 检索分支（P9）：命中概念后按 `concept_edge` 扩展取 chunk |
 | ChromaDB | **不变**（仍按 filename 分 collection），跨 PDF 检索通过 `source_refs` 协调 |
-| Alembic | 新增 2 个迁移（建表 + 数据迁移脚本） |
+| Alembic | 新增 2 个迁移（建表 ✅已执行 + 数据迁移脚本，后者未执行） |
+| `concept_extraction.py`（新，已实现） | 抽取（§6.2）+ embedding（§6.3）+ 消歧（§6.4）+ 跨PDF（§6.5），供 `main.py` 调用 |
+| `main.py`（已实现） | 上传后台处理（`process_pdf_background`）里自动调用概念抽取；新增 `GET /courses/{course_id}/graph` 端点 |
+| 前端（已实现） | 课程页新增「文件列表 / 知识图谱」切换，复用 `Mermaid` 组件渲染 `graph TD`，按来源/关系类型着色分层 |
 
 ---
 
 ## 8. 待决问题 (Open Questions)
 
-- [ ] `concept.embedding` 用 JSONB 还是引入 **pgvector**？（建议起步 JSONB，规模上来后迁 pgvector，记入 ADR-0003）
-- [ ] 图存储长期是否迁移到 Neo4j？多跳查询成为瓶颈时再评估（ADR-0003）
+- [x] `concept.embedding` 用 JSONB 还是引入 **pgvector**？→ **已定：JSONB**，Python 原生余弦，暂不合并 ChromaDB，推迟到 P13 容器化。见 [ADR-0005](../adr/0005-vector-storage-jsonb-vs-pgvector.md)。
+- [ ] 图存储长期是否迁移到 Neo4j？多跳查询成为瓶颈时再评估（ADR-0005 触发信号之一）
 - [ ] `quiz_progress` 的概念关联用 JSONB 内嵌还是中间表？（P9 定）
 - [ ] 跨课程的概念复用（同一概念出现在多门课）是否需要全局概念库？（暂不做，保持课程隔离）
+- [ ] `concept.attributes` 尚未填充——待具体功能（如展示定义/公式）需要时再设计抽取方式。
+- [ ] 图谱准确性监测尚未系统化（LangFuse 埋点 + LLM-judge 抽检，计划见 [concept-extraction-pipeline.md §9.4](./concept-extraction-pipeline.md)）。
 ```

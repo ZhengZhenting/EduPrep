@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CoursesAPI, PdfAPI, type CourseDetail, type PdfFile } from "../../lib/api";
+import { CoursesAPI, PdfAPI, GraphAPI, type CourseDetail, type PdfFile, type CourseGraph } from "../../lib/api";
 import { ArrowLeft, FileText, Upload, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { Mermaid } from "../../components/workspace/Mermaid";
 
 export const Route = createFileRoute("/_authenticated/courses/$courseId")({ component: CourseDetail });
 
@@ -16,6 +17,7 @@ function CourseDetail() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [view, setView] = useState<"files" | "graph">("files");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const refresh = async () => {
@@ -65,6 +67,18 @@ function CourseDetail() {
       <h1 className="mt-2 text-4xl font-bold tracking-tight">{course?.title || "Course"}</h1>
       <p className="mt-2 text-muted-foreground">Upload PDFs and open them to start the Preview → Learn → Quiz cycle.</p>
 
+      {/* View toggle: files vs knowledge graph */}
+      <div className="mt-6 inline-flex rounded-lg border border-black/[0.12] p-1 text-sm">
+        <button onClick={() => setView("files")}
+          className={`rounded-md px-3 py-1.5 transition ${view === "files" ? "bg-black/[0.06] font-medium" : "text-muted-foreground hover:text-foreground"}`}>📄 文件列表</button>
+        <button onClick={() => setView("graph")}
+          className={`rounded-md px-3 py-1.5 transition ${view === "graph" ? "bg-black/[0.06] font-medium" : "text-muted-foreground hover:text-foreground"}`}>🕸️ 知识图谱</button>
+      </div>
+
+      {view === "graph" ? (
+        <GraphView courseId={cid} />
+      ) : (
+      <>
       {/* Upload zone */}
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -131,6 +145,62 @@ function CourseDetail() {
             </AnimatePresence>
           </div>
         )}
+      </div>
+      </>
+      )}
+    </div>
+  );
+}
+
+// ---- Knowledge graph view (P8): fetch + render via Mermaid ----
+const STRONG = new Set(["is_a", "prerequisite", "part_of"]);
+
+function toMermaid(g: CourseGraph, showRelated: boolean): string {
+  const lines: string[] = ["graph TD"];
+  for (const n of g.nodes) {
+    const label = (n.name || "").replace(/"/g, "'").replace(/[[\]{}|]/g, "");
+    lines.push(`  n${n.id}["${label}"]`);
+  }
+  for (const e of g.edges) {
+    if (!showRelated && e.type === "related") continue;
+    if (STRONG.has(e.type)) lines.push(`  n${e.from} -->|${e.type}| n${e.to}`);
+    else lines.push(`  n${e.from} -.-> n${e.to}`);
+  }
+  const shared = g.nodes.filter((n) => (n.sources?.length || 0) > 1).map((n) => `n${n.id}`);
+  if (shared.length) {
+    lines.push(`  classDef shared fill:#ede9fe,stroke:#7c3aed,color:#4c1d95;`);
+    lines.push(`  class ${shared.join(",")} shared;`);
+  }
+  return lines.join("\n");
+}
+
+function GraphView({ courseId }: { courseId: number }) {
+  const [graph, setGraph] = useState<CourseGraph | null>(null);
+  const [showRelated, setShowRelated] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    GraphAPI.get(courseId)
+      .then(setGraph)
+      .catch(() => toast.error("Failed to load knowledge graph"))
+      .finally(() => setLoading(false));
+  }, [courseId]);
+
+  if (loading) return <div className="mt-8 rounded-xl glass p-8 text-center text-sm text-muted-foreground">Loading graph…</div>;
+  if (!graph || graph.nodes.length === 0)
+    return <div className="mt-8 rounded-xl glass p-8 text-center text-sm text-muted-foreground">还没有概念图谱。上传 PDF 后会自动抽取概念并生成。</div>;
+
+  return (
+    <div className="mt-6">
+      <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
+        <span>紫色 = 跨 PDF 共享概念 · 实线 = 强关系 · 虚线 = related · {graph.nodes.length} 概念 / {graph.edges.length} 关系</span>
+        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+          <input type="checkbox" checked={showRelated} onChange={(e) => setShowRelated(e.target.checked)} /> 显示 related 边
+        </label>
+      </div>
+      <div className="rounded-xl glass p-4 overflow-auto">
+        <Mermaid chart={toMermaid(graph, showRelated)} />
       </div>
     </div>
   );

@@ -302,29 +302,35 @@
       <span class="phase-date">08-08 → 09-12 · 5w</span>
     </div>
     <span class="phase-depth depth-algo"><span class="zh">算法深度 · 核心</span><span class="en">Algorithmic · core</span></span>
+    <span style="display:inline-block;margin-left:8px;font-size:12px;padding:2px 9px;border-radius:6px;font-weight:600;background:rgba(91,157,255,.18);color:var(--accent)"><span class="zh">🚧 垂直切片已实现</span><span class="en">🚧 Vertical slice implemented</span></span>
     <p class="section-sub" style="margin:10px 0 0">
-      <span class="zh">把零散 PDF 缝成课程级概念网络。靠 P7 的多模态转写，概念抽取能覆盖公式图解，质量更高。</span>
-      <span class="en">Stitch scattered PDFs into a course-level concept network. Thanks to P7's multimodal transcription, concept extraction now covers formulas and figures, raising quality.</span>
+      <span class="zh">把零散 PDF 缝成课程级概念网络。P7 的结论是视觉转写不进检索排序，但转写能力（`vision_transcribe.py`）在这里复用——从图/公式抽概念不受同质化影响。</span>
+      <span class="en">Stitch scattered PDFs into a course-level concept network. P7 concluded vision transcription must never enter retrieval ranking, but its transcription capability (`vision_transcribe.py`) is reused here — extracting concepts from figures/formulas isn't subject to the homogenization problem.</span>
     </p>
+    <div style="background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:12px 16px;margin:12px 0;font-size:13.5px">
+      <strong style="color:var(--accent)"><span class="zh">实测进展（NCC + KNN，2026-07-08）：</span><span class="en">Progress (NCC + KNN, 2026-07-08): </span></strong>
+      <span class="zh">建表→抽取→消歧→跨PDF关系→endpoint→前端可视化全链路跑通。消歧阈值校准为 <b>0.70</b>（余弦相似度），修复了跨 PDF 候选池 bug（首份 PDF 误产出 16 条"跨PDF边"→修复后为 0）；跨 PDF <code>top_k</code> 收紧到 <b>5</b>，多个同义/跨语言概念（含英德混合术语）被正确合并。前端复用 <code>Mermaid</code> 组件渲染，无需新依赖。<b>尚未做</b>：Celery 异步、react-flow 交互式布局、准确性监测（LangFuse 埋点 + LLM-judge 抽检，已设计未实现）。</span>
+      <span class="en">Full chain works end-to-end: build tables → extract → disambiguate → cross-PDF link → endpoint → frontend viz. Disambiguation threshold calibrated to <b>0.70</b> cosine similarity; fixed a cross-PDF candidate-pool bug (first PDF wrongly produced 16 "cross-PDF" edges → 0 after fix); cross-PDF <code>top_k</code> tightened to <b>5</b>; multiple synonym/cross-language concepts (incl. mixed German/English terms) correctly merged. Frontend reuses the existing <code>Mermaid</code> component, no new dependency. <b>Not yet done</b>: Celery async, react-flow interactive layout, accuracy monitoring (LangFuse telemetry + LLM-judge spot-checks — designed, not implemented).</span>
+    </div>
     <div class="phase-grid">
       <div class="phase-col">
         <h5><span class="zh">功能 / 技术</span><span class="en">Features / Tech</span></h5>
         <ul>
-          <li><span class="zh">概念抽取：Claude 结构化输出 概念 + 关系</span><span class="en">Concept extraction: Claude structured output of concepts + relations</span></li>
-          <li><span class="zh">关系类型</span><span class="en">Relations</span>: <code>prerequisite</code> <code>related</code> <code>part_of</code> <code>equivalent_de</code></li>
-          <li><span class="zh">实体消歧 + 增量合并（embedding 相似度 + Claude 裁决）</span><span class="en">Entity disambiguation + incremental merge (embedding similarity + Claude adjudication)</span></li>
-          <li><span class="zh">图谱可视化：react-flow / cytoscape.js</span><span class="en">Graph viz: react-flow / cytoscape.js</span></li>
-          <li><span class="zh">引入 <code>Celery + Redis</code> 异步处理抽取</span><span class="en">Introduce <code>Celery + Redis</code> for async extraction</span></li>
-          <li><span class="zh">新增 4 表</span><span class="en">4 new tables</span>: <code>concept</code> <code>concept_edge</code> <code>concept_mastery</code> <code>learning_path</code></li>
+          <li><span class="zh">概念抽取：Claude 结构化输出 概念 + 关系</span><span class="en">Concept extraction: Claude structured output of concepts + relations</span> ✅</li>
+          <li><span class="zh">关系类型</span><span class="en">Relations</span>: <code>is_a</code> <code>prerequisite</code> <code>part_of</code> <code>related</code> <span class="zh">（<code>equivalent_de</code> 已改为"概念名统一存德语"，不再需要）</span><span class="en">(<code>equivalent_de</code> resolved by storing concept names in German instead)</span> ✅</li>
+          <li><span class="zh">实体消歧 + 增量合并（embedding 相似度 + Claude 裁决）</span><span class="en">Entity disambiguation + incremental merge (embedding similarity + Claude adjudication)</span> ✅</li>
+          <li><span class="zh">图谱可视化：先用 <code>Mermaid</code>（已实现），react-flow / cytoscape.js 留作 v2</span><span class="en">Graph viz: <code>Mermaid</code> first (done), react-flow / cytoscape.js as v2</span></li>
+          <li><span class="zh">引入 <code>Celery + Redis</code> 异步处理抽取（尚未做，现跑在已有的 <code>ThreadPoolExecutor</code>）</span><span class="en">Introduce <code>Celery + Redis</code> for async extraction (not yet — currently runs in the existing <code>ThreadPoolExecutor</code>)</span></li>
+          <li><span class="zh">新增 4 表</span><span class="en">4 new tables</span>: <code>concept</code> <code>concept_edge</code> <code>concept_mastery</code> <code>learning_path</code> <span class="zh">✅ 已迁移</span><span class="en">✅ migrated</span></li>
         </ul>
       </div>
       <div class="phase-col">
         <h5><span class="zh">文档产出</span><span class="en">Docs Deliverables</span></h5>
         <ul class="doc-list">
-          <li><a href="../architecture/knowledge-graph-schema.md">knowledge-graph-schema.md</a> <span class="zh">✅ 已起草</span><span class="en">✅ drafted</span></li>
-          <li><code>concept-extraction-pipeline.md</code></li>
-          <li><code>ADR-0005</code> <span class="zh">图存储 PG vs Neo4j · JSONB vs pgvector</span><span class="en">graph storage PG vs Neo4j · JSONB vs pgvector</span></li>
-          <li><span class="zh">更新</span><span class="en">Update</span> <code>er_diagram.svg</code></li>
+          <li><a href="../architecture/knowledge-graph-schema.md">knowledge-graph-schema.md</a> <span class="zh">✅ 已实现</span><span class="en">✅ implemented</span></li>
+          <li><a href="../architecture/concept-extraction-pipeline.md">concept-extraction-pipeline.md</a> <span class="zh">✅ 已实现 + 实测校准（§9）</span><span class="en">✅ implemented + calibrated (§9)</span></li>
+          <li><a href="../adr/0005-vector-storage-jsonb-vs-pgvector.md">ADR-0005</a> <span class="zh">✅ JSONB（暂不 pgvector / 暂不合并 ChromaDB）</span><span class="en">✅ JSONB (no pgvector / no ChromaDB merge yet)</span></li>
+          <li><span class="zh">更新</span><span class="en">Update</span> <code>er_diagram.svg</code> <span class="zh">（待做）</span><span class="en">(pending)</span></li>
         </ul>
       </div>
     </div>

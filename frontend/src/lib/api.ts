@@ -209,3 +209,13 @@ export type UserStats = { streak: number; level: number; xp: number };
 export const StatsAPI = {
   get: (): Promise<UserStats> => api.get("/me/stats").then((r) => r.data),
 };
+
+// ---------- Knowledge graph (P8) ----------
+export type GraphNode = { id: number; name: string; description?: string; sources: number[] };
+export type GraphEdge = { from: number; to: number; type: string; weight?: number };
+export type CourseGraph = { course_id: number; nodes: GraphNode[]; edges: GraphEdge[] };
+
+export const GraphAPI = {
+  get: (courseId: number): Promise<CourseGraph> =>
+    api.get<CourseGraph>(`/courses/${courseId}/graph`).then((r) => r.data),
+};
