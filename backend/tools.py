@@ -1,21 +1,19 @@
-import os
-import re
-from dotenv import load_dotenv
-from langchain_core.tools import tool
-from tavily import TavilyClient
-
-load_dotenv()
-OLLAMA_URL = os.getenv("OLLAMA_URL")
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-
-# Helper functions
-def _extract_mermaid_body(raw: str) -> str:    
-    """Mermaid text, remove markdown markings"""
-    text = raw.strip()
-    text = re.sub(r"^```(?:mermaid)?\s*\n?", "", text)  # remove beginning ```mermaid or ```
-    text = re.sub(r"\n?```\s*$", "", text)              # remove trailing ```
+import os 
+import re 
+from dotenv import load_dotenv 
+from langchain_core.tools import tool 
+from sqlalchemy import text
+from tavily import TavilyClient 
+load_dotenv() 
+OLLAMA_URL = os.getenv("OLLAMA_URL") 
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY") # Helper functions 
+def _extract_mermaid_body(raw: str) -> str: 
+    """Mermaid text, remove markdown markings""" 
+    text = raw.strip() 
+    text = re.sub(r"^(?:mermaid)?\s*\n?", "", text)  # remove beginningmermaid or
+    text = re.sub(r"\n?\s*$", "", text) # remove trailing
     return text.strip()
- 
+
 # Tool1:Tavily Web Search
 @tool
 def search_web(query: str) -> str:
@@ -84,29 +82,22 @@ def generate_mermaid_chart(description: str) -> str:
         - Start directly with the diagram-type keyword"""
 
     try:
-        client = _anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
+            client = _anthropic.Anthropic(api_key=api_key)
+            message = client.messages.create(
             model="claude-sonnet-4-5",
             max_tokens=500,
             messages=[{"role": "user", "content": prompt}]
-        )
-        raw_text = message.content[0].text
-        body = _extract_mermaid_body(raw_text)
-        if not body:
-            return (
-                "```mermaid\n"
-                "flowchart LR\n"
-                '  A["Empty output"] --> B["Try rephrasing"]\n'
-                "```"
             )
-        return f"```mermaid\n{body}\n```"
+            raw_text = message.content[0].text
+            body = _extract_mermaid_body(raw_text)
+            if not body:
+             return (
+                "mermaid\n" "flowchart LR\n" ' A["Empty output"] --> B["Try rephrasing"]\n' ""
+            )
+            return f"mermaid\n{body}\n"
 
 
     except Exception as e:
-        return (
-            "```mermaid\n"
-            "flowchart LR\n"
-            f'  A["Diagram generation failed"] --> B["{type(e).__name__}"]\n'
-            "```"
-        )
-
+            return (
+            "mermaid\n" "flowchart LR\n" f' A["Diagram generation failed"] --> B["{type(e).__name__}"]\n' "" 
+            )

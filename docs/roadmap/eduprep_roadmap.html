@@ -406,27 +406,33 @@
       <span class="phase-date">11-14 → 12-19 · 5w</span>
     </div>
     <span class="phase-depth depth-frontier"><span class="zh">技术前沿</span><span class="en">Frontier</span></span>
+    <span style="display:inline-block;margin-left:8px;font-size:12px;padding:2px 9px;border-radius:6px;font-weight:600;background:rgba(124,92,255,.18);color:var(--accent2)"><span class="zh">🚧 Agent 循环已实现，MCP 未开始</span><span class="en">🚧 Agent loop implemented, MCP not started</span></span>
     <p class="section-sub" style="margin:10px 0 0">
-      <span class="zh">把写死的 /ask 流水线升级成会决策的 Agent；用 MCP 把项目从"应用"抬成"平台"。</span>
-      <span class="en">Upgrade the hard-coded /ask pipeline into a decision-making Agent; use MCP to lift the project from "an app" to "a platform".</span>
+      <span class="zh">把写死的 /ask 流水线升级成会决策的 Agent；用 MCP 把项目从"应用"抬成"平台"。（本阶段跳过 P9/P10 提前做，直接建在 P8 知识图谱之上）</span>
+      <span class="en">Upgrade the hard-coded /ask pipeline into a decision-making Agent; use MCP to lift the project from "an app" to "a platform". (Built ahead of P9/P10, directly on top of P8's knowledge graph.)</span>
     </p>
+    <div style="background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent2);border-radius:10px;padding:12px 16px;margin:12px 0;font-size:13.5px">
+      <strong style="color:var(--accent2)"><span class="zh">实现进展（2026-07-08）：</span><span class="en">Progress (2026-07-08): </span></strong>
+      <span class="zh">一个 agent = 一张 LangGraph <code>StateGraph</code>（Planner→ToolNode→Reflector，条件边控制循环/重试），新端点 <code>POST /ask/agent</code> 已跑通并接入前端。实现过程中踩了 <b>4 个真实 bug</b>：TypedDict 状态判断错误（用 key 存在性判断"是否完成"，key 一旦初始化就永远存在）、LangGraph 并发执行工具触发 ChromaDB 竞态、轮次上限的安全阀违反 Anthropic 的 tool_use/tool_result 协议、前端 <code>UrlsFooter</code> 被旧设计的 <code>web_supplement</code> 判断误耦合——四个都已定位根因并修复，完整记录见 <a href="../architecture/agent-orchestration.md">agent-orchestration.md §5</a>。<b>尚未做</b>：MCP Server、Agent 版本的评测（无法量化是否比旧 <code>/ask</code> 更好）、掌握度工具因 P10 未实现而恒无数据。</span>
+      <span class="en">One agent = one LangGraph <code>StateGraph</code> (Planner→ToolNode→Reflector, conditional edges drive looping/retry); the new <code>POST /ask/agent</code> endpoint works end-to-end and is wired into the frontend. Building it surfaced <b>4 real bugs</b>: a TypedDict state check that was always false (checking key-existence for "is this done?" when the key is always present once initialized), a ChromaDB concurrency race triggered by LangGraph's parallel tool execution, a round-cap safety net that violated Anthropic's tool_use/tool_result protocol, and a frontend <code>UrlsFooter</code> wrongly coupled to the old <code>web_supplement</code> design. All root-caused and fixed — full writeup in <a href="../architecture/agent-orchestration.md">agent-orchestration.md §5</a>. <b>Not yet done</b>: MCP Server, Agent-path evaluation (can't yet quantify whether it beats plain <code>/ask</code>), mastery tool is always empty since P10 isn't implemented.</span>
+    </div>
     <div class="phase-grid">
       <div class="phase-col">
         <h5><span class="zh">功能 / 技术</span><span class="en">Features / Tech</span></h5>
         <ul>
-          <li><span class="zh">Agent 编排：<code>LangGraph</code>，Planner → Tool Router → Reflector</span><span class="en">Agent orchestration: <code>LangGraph</code>, Planner → Tool Router → Reflector</span></li>
-          <li><span class="zh">工具</span><span class="en">Tools</span>: <code>query_knowledge_graph</code> · <code>get_concept_mastery</code> · <code>schedule_review</code> · <code>generate_adaptive_quiz</code> · <code>verify_citation</code></li>
-          <li><span class="zh">MCP Server：把学习能力暴露给 Claude Desktop / Cursor</span><span class="en">MCP Server: expose learning capabilities to Claude Desktop / Cursor</span></li>
-          <li><span class="zh">模型分层：主循环 <code>claude-opus-4-8</code>，工具抽取 <code>claude-sonnet-4-6</code></span><span class="en">Model tiering: <code>claude-opus-4-8</code> for the main loop, <code>claude-sonnet-4-6</code> for tool extraction</span></li>
+          <li><span class="zh">Agent 编排：<code>LangGraph</code>，Planner → Tool Router → Reflector</span><span class="en">Agent orchestration: <code>LangGraph</code>, Planner → Tool Router → Reflector</span> ✅</li>
+          <li><span class="zh">工具</span><span class="en">Tools</span>: <code>search_pdf</code> <code>query_knowledge_graph</code> <code>get_concept_mastery</code> <code>search_web</code> <span class="zh">✅（<code>schedule_review</code>/<code>generate_adaptive_quiz</code>/<code>verify_citation</code> 待 P10 后再加）</span><span class="en">✅ (<code>schedule_review</code>/<code>generate_adaptive_quiz</code>/<code>verify_citation</code> pending P10)</span></li>
+          <li><span class="zh">MCP Server：把学习能力暴露给 Claude Desktop / Cursor</span><span class="en">MCP Server: expose learning capabilities to Claude Desktop / Cursor</span> <span class="zh">（未开始）</span><span class="en">(not started)</span></li>
+          <li><span class="zh">模型分层：Planner/Reflector 现用 <code>claude-sonnet-4-5</code>（与项目其它端点一致），opus 主循环留待成本/质量数据支持后再评估</span><span class="en">Model tiering: Planner/Reflector currently use <code>claude-sonnet-4-5</code> (consistent with the rest of the app); opus main loop deferred until cost/quality data justifies it</span></li>
         </ul>
       </div>
       <div class="phase-col">
         <h5><span class="zh">文档产出</span><span class="en">Docs Deliverables</span></h5>
         <ul class="doc-list">
-          <li><code>agent-orchestration.md</code></li>
-          <li><code>mcp-server.md</code></li>
-          <li><code>ADR-0009</code> LangGraph vs <span class="zh">自研循环</span><span class="en">custom loop</span></li>
-          <li><span class="zh">更新 README：加 "EduPrep as MCP Server" 卖点</span><span class="en">Update README: add the "EduPrep as MCP Server" selling point</span></li>
+          <li><a href="../architecture/agent-orchestration.md">agent-orchestration.md</a> <span class="zh">✅ 已实现，含 4 个真实 bug 的根因分析</span><span class="en">✅ implemented, incl. 4 real bug root-causes</span></li>
+          <li><code>mcp-server.md</code> <span class="zh">（待写）</span><span class="en">(pending)</span></li>
+          <li><a href="../adr/0009-langgraph-vs-custom-loop.md">ADR-0009</a> LangGraph vs <span class="zh">自研循环</span><span class="en">custom loop</span> <span class="zh">✅</span><span class="en">✅</span></li>
+          <li><span class="zh">更新 README：加 "EduPrep as MCP Server" 卖点</span><span class="en">Update README: add the "EduPrep as MCP Server" selling point</span> <span class="zh">（待 MCP 完成后再加）</span><span class="en">(pending MCP completion)</span></li>
         </ul>
       </div>
     </div>

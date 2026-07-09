@@ -176,6 +176,10 @@ export const AIAPI = {
     api.post<PreviewData>("/preview", { filename, course_id }).then((r) => r.data),
   ask: (data: { filename: string; course_id: number; question: string; history?: ChatMsg[] }) =>
     api.post("/ask", data).then((r) => r.data),
+  // P11: LangGraph agent version of /ask. Returns {question, answer, verified, tool_rounds}
+  // — no pages/web_supplement yet (that detail lives in tool call logs, not the response shape).
+  askAgent: (data: { filename: string; course_id: number; question: string; history?: ChatMsg[] }) =>
+    api.post("/ask/agent", data).then((r) => r.data as { question: string; answer: string; verified: boolean; tool_rounds: number; sources: any }),
   // Bug 5 fix: normalize quiz options {A,B,C,D} → string[] and answer letter → index
   quiz: (filename: string, course_id: number, num_questions = 5): Promise<{ questions: QuizQuestion[] }> =>
     api.post("/quiz", { filename, course_id, num_questions }).then((r) => ({

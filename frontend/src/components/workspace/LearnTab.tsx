@@ -95,11 +95,15 @@ export function LearnTab({ filename, courseId, onActivity }: { filename: string;
     setInput("");
     setSending(true);
     try {
-      const res = await AIAPI.ask({ filename, course_id: courseId, question: q, history: messages });
-      const answer = res.pdf_answer ?? res.answer ?? res.content ?? JSON.stringify(res);
-      const sources = res.sources; // contains pages / urls / web_supplement
-      const source_type = res.source_type ?? "pdf";
-      setMessages((m) => [...m, { role: "assistant", content: answer, sources, source_type }]);
+      // P11: using the LangGraph agent endpoint. Response shape is {answer, sources: {pages, urls}, verified, tool_rounds}
+      const res = await AIAPI.askAgent({ filename, course_id: courseId, question: q, history: messages });
+      const answer = res.answer ?? JSON.stringify(res);
+      // Badge reflects what was ACTUALLY used (from sources), not just the verified flag —
+      // pdf pages if search_pdf was used, web urls if search_web was used, both if both were used.
+      const pages = res.sources?.pages ?? [];
+      const urls = res.sources?.urls ?? [];
+      const source_type = pages.length && urls.length ? "pdf+web" : urls.length ? "web" : pages.length ? "pdf" : "agent";
+      setMessages((m) => [...m, { role: "assistant", content: answer, sources: res.sources, source_type }]);
       onActivity?.();
     } catch (e: any) {
       setMessages((m) => [...m, { role: "assistant", content: `⚠️ ${e?.response?.data?.detail || "Request failed"}` }]);
@@ -146,7 +150,12 @@ export function LearnTab({ filename, courseId, onActivity }: { filename: string;
                     {/* Part 1: lecture answer page numbers */}
                     <PagesFooter sources={m.sources} />
 
-                    {/* Part 2: web supplement (only when present) */}
+                    {/* URLs render independently of web_supplement — the agent path merges web
+                        content directly into the answer text (no separate supplement block),
+                        so urls must not be gated behind a web_supplement check. */}
+                    <UrlsFooter sources={m.sources} />
+
+                    {/* Part 2: web supplement text block (only for the legacy /ask two-part answer) */}
                     {(() => {
                       const { web_supplement } = parseSources(m.sources);
                       if (!web_supplement) return null;
@@ -158,7 +167,6 @@ export function LearnTab({ filename, courseId, onActivity }: { filename: string;
                           <div className="prose prose-sm max-w-none">
                             <ReactMarkdown>{web_supplement}</ReactMarkdown>
                           </div>
-                          <UrlsFooter sources={m.sources} />
                         </div>
                       );
                     })()}
@@ -167,7 +175,7 @@ export function LearnTab({ filename, courseId, onActivity }: { filename: string;
                     <div className="mt-2 flex items-center justify-between gap-3">
                       {m.source_type && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          {m.source_type === "pdf+web" ? <Globe className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+                          {m.source_type?.includes("web") ? <Globe className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
                           {m.source_type}
                         </span>
                       )}

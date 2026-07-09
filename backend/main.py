@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from wasabi import msg
 from observability import langfuse, logger, generate_request_id
 from concept_extraction import extract_concepts, merge_into_graph, link_cross_pdf
+from agent_graph import run_agent
 
 
 from pdf_processor import process_pdf
@@ -612,6 +613,49 @@ async def ask_question(request: QuestionRequest,
         "sources": final_sources,
     }
 
+@app.post("/ask/agent")
+async def ask_question_agent(request: QuestionRequest,
+                             db: Session = Depends(get_db),
+                             current_user: User = Depends(get_current_user)):
+    """P11: LangGraph agent 版 /ask。独立新端点，不影响现有 /ask 的行为。
+    暂不接入 conversation memory / history 压缩（现有 /ask 的功能），先跑通 agent 架构本身。"""
+    print(f"[/ask/agent] filename={request.filename} course_id={request.course_id} q={request.question[:50]!r}")
+
+    course = db.query(Course).filter(
+        Course.id == request.course_id, Course.user_id == current_user.id
+    ).first()
+    if not course:
+        raise HTTPException(status_code=403, detail="Not authorized.")
+
+    pdf_file = db.query(PdfFile).filter(
+        PdfFile.filename == request.filename, PdfFile.course_id == request.course_id
+    ).first()
+    if not pdf_file:
+        raise HTTPException(status_code=404, detail="PDF file not found in database.")
+
+    result = run_agent(request.question, request.filename, request.course_id)
+
+    # 和 /ask 用同一套 {pages, urls, web_supplement} 结构，前端 PagesFooter/UrlsFooter 直接复用
+    final_sources = {
+        "pages": result["pages_used"],
+        "urls": result["urls_used"],
+        "web_supplement": "",  # agent 不分离两段答案，联网内容已融进 answer 本身
+    }
+    db.add(Message(pdf_file_id=pdf_file.id, role="user", content=request.question))
+    db.add(Message(
+        pdf_file_id=pdf_file.id, role="assistant", content=result["answer"],
+        source_type="agent" if not result["urls_used"] else "agent+web",
+        sources=final_sources,
+    ))
+    db.commit()
+
+    return {
+        "question": request.question,
+        "answer": result["answer"],
+        "verified": result["verified"],
+        "tool_rounds": result["tool_rounds"],
+        "sources": final_sources,
+    }
 
 @app.get("/message/{filename}")
 async def get_messages(filename: str, 
@@ -1214,4 +1258,3 @@ async def get_course_graph(course_id: int,
     } for e in edges]
 
     return {"course_id": course_id, "nodes": nodes, "edges": edge_list}
-
